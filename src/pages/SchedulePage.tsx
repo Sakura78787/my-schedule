@@ -123,13 +123,11 @@ export default function SchedulePage() {
 
   const handleUpdateSchedule = async (id: string) => {
     let originalContent = '';
-    let originalSlot = '';
     
     for (const slot of Object.keys(schedules)) {
       const item = schedules[slot]?.find(i => i.id === id);
       if (item) {
         originalContent = item.content;
-        originalSlot = slot;
         break;
       }
     }
