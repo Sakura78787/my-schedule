@@ -182,7 +182,7 @@ export default function SchedulePage() {
       [timeSlot]: [...(prev[timeSlot] || []), newItem]
     }));
     setNewContent(prev => ({ ...prev, [timeSlot]: '' }));
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('schedule')
       .insert([{
         user_id: user.id,
@@ -214,12 +214,10 @@ export default function SchedulePage() {
   };
 
   const handleUpdateSchedule = async (id: string) => {
-    let originalContent = '';
     let timeSlot = '';
     for (const slot of ALL_SLOTS) {
       const item = schedules[slot]?.find(i => i.id === id);
       if (item) {
-        originalContent = item.content;
         timeSlot = slot;
         break;
       }
