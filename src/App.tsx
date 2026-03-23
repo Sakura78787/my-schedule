@@ -4,6 +4,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import AuthPage from './pages/AuthPage';
 import SchedulePage from './pages/SchedulePage';
 import TodosPage from './pages/TodosPage';
+import CalendarPage from './pages/CalendarPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -53,6 +54,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <TodosPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/calendar"
+        element={
+          <ProtectedRoute>
+            <CalendarPage />
           </ProtectedRoute>
         }
       />
