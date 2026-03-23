@@ -189,7 +189,7 @@ export default function TodosPage() {
   if (!user) return null;
 
   return (
-    <div className={`min-h-screen pb-72 ${theme === 'dark' ? 'bg-slate-900' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'}`}>
+    <div className={`min-h-screen pb-96 ${theme === 'dark' ? 'bg-slate-900' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'}`}>
       <div className="p-4">
         <div className="flex justify-between items-center mb-6">
           <button
@@ -351,34 +351,34 @@ export default function TodosPage() {
         )}
       </div>
 
-      <div className={`fixed bottom-20 left-0 right-0 ${theme === 'dark' ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-lg border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'} px-4 py-4`}>
-        <div className="max-w-md mx-auto space-y-3">
+      <div className={`fixed bottom-16 left-0 right-0 ${theme === 'dark' ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-lg border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'} px-4 py-3`}>
+        <div className="max-w-md mx-auto space-y-2">
           <input
             type="text"
             value={newContent}
             onChange={(e) => setNewContent(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleAddTodo(); }}
             placeholder={`添加${tab === 'task' ? '待办事项' : '奇思妙想'}...`}
-            className={`w-full px-4 py-3 rounded-2xl shadow-inner ${
+            className={`w-full px-4 py-2 rounded-xl shadow-inner ${
               theme === 'dark'
                 ? 'bg-slate-800 text-white placeholder-slate-500'
                 : 'bg-slate-50 placeholder-slate-400'
             }`}
           />
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <input
               type="text"
               value={newRemark}
               onChange={(e) => setNewRemark(e.target.value)}
               placeholder="备注（可选）"
-              className={`flex-1 px-3 py-2 rounded-xl ${
+              className={`flex-1 px-3 py-1.5 rounded-lg ${
                 theme === 'dark' ? 'bg-slate-800 text-white placeholder-slate-500' : 'bg-white placeholder-slate-400'
               }`}
             />
             <select
               value={newPriority}
               onChange={(e) => setNewPriority(e.target.value as 'high' | 'medium' | 'low')}
-              className={`px-3 py-2 rounded-xl font-medium ${
+              className={`px-3 py-1.5 rounded-lg font-medium ${
                 theme === 'dark' ? 'bg-slate-800 text-white' : 'bg-white'
               }`}
             >
@@ -389,7 +389,7 @@ export default function TodosPage() {
             <button
               onClick={handleAddTodo}
               disabled={!newContent.trim()}
-              className="px-6 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold shadow-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg font-bold shadow-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
             >
               添加
             </button>
@@ -449,31 +449,31 @@ export default function TodosPage() {
         </div>
       )}
 
-      <div className={`fixed bottom-0 left-0 right-0 ${theme === 'dark' ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-lg border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'} px-4 py-3 pb-8`}>
+      <div className={`fixed bottom-0 left-0 right-0 ${theme === 'dark' ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-lg border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'} px-4 py-2 pb-5`}>
         <div className="flex justify-around max-w-md mx-auto">
           <button
             onClick={navigateToSchedule}
-            className={`flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all ${
+            className={`flex flex-col items-center gap-0.5 px-6 py-1 rounded-xl transition-all ${
               theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            <span className="text-2xl">📖</span>
-            <span className="font-medium">微观</span>
+            <span className="text-lg">📖</span>
+            <span className="font-medium text-xs">微观</span>
           </button>
           <button
             onClick={navigateToCalendar}
-            className={`flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all ${
+            className={`flex flex-col items-center gap-0.5 px-6 py-1 rounded-xl transition-all ${
               theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            <span className="text-2xl">📆</span>
-            <span className="font-medium">宏观</span>
+            <span className="text-lg">📆</span>
+            <span className="font-medium text-xs">宏观</span>
           </button>
           <button
-            className="flex flex-col items-center gap-1 px-6 py-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+            className="flex flex-col items-center gap-0.5 px-6 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white"
           >
-            <span className="text-2xl">✅</span>
-            <span className="font-bold">待办灵感</span>
+            <span className="text-lg">✅</span>
+            <span className="font-bold text-xs">待办灵感</span>
           </button>
         </div>
       </div>

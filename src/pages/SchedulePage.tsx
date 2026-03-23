@@ -24,7 +24,7 @@ interface TimeBlock {
 const TIME_BLOCKS: TimeBlock[] = [
   {
     name: '早上',
-    slots: ['08:00-12:00'],
+    slots: ['08:00-10:00', '10:00-12:00'],
     color: 'from-yellow-400 to-amber-500'
   },
   {
@@ -34,17 +34,17 @@ const TIME_BLOCKS: TimeBlock[] = [
   },
   {
     name: '下午',
-    slots: ['14:00-18:00'],
+    slots: ['14:00-16:00', '16:00-18:00'],
     color: 'from-amber-400 to-yellow-600'
   },
   {
     name: '晚上',
-    slots: ['18:00-24:00'],
+    slots: ['18:00-20:00', '20:00-22:00', '22:00-24:00'],
     color: 'from-indigo-500 to-purple-600'
   },
   {
     name: '凌晨',
-    slots: ['00:00-08:00'],
+    slots: ['00:00-02:00', '02:00-04:00', '04:00-06:00', '06:00-08:00'],
     color: 'from-blue-600 to-indigo-700'
   }
 ];
@@ -52,13 +52,21 @@ const TIME_BLOCKS: TimeBlock[] = [
 const ALL_SLOTS = TIME_BLOCKS.flatMap(block => block.slots);
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
+const getTodayLocal = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function SchedulePage() {
   const { user, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const dateParam = searchParams.get('date');
-  const [currentDate, setCurrentDate] = useState(dateParam || new Date().toISOString().split('T')[0]);
+  const [currentDate, setCurrentDate] = useState(dateParam || getTodayLocal());
   const [schedules, setSchedules] = useState<Record<string, ScheduleItem[]>>({});
   const [loading, setLoading] = useState(false);
   const [newContent, setNewContent] = useState<Record<string, string>>({});
@@ -83,13 +91,15 @@ export default function SchedulePage() {
   useEffect(() => {
     if (dateParam) {
       setCurrentDate(dateParam);
+    } else {
+      setCurrentDate(getTodayLocal());
     }
   }, [dateParam]);
 
   useEffect(() => {
     if (!dateParam) {
       const checkDate = () => {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayLocal();
         if (currentDate !== today) {
           setCurrentDate(today);
         }
@@ -127,14 +137,17 @@ export default function SchedulePage() {
   }, [fetchSchedules]);
 
   const changeDate = (days: number) => {
-    const newDate = new Date(currentDate);
+    const newDate = new Date(currentDate + 'T00:00:00');
     newDate.setDate(newDate.getDate() + days);
-    const dateStr = newDate.toISOString().split('T')[0];
+    const year = newDate.getFullYear();
+    const month = String(newDate.getMonth() + 1).padStart(2, '0');
+    const day = String(newDate.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
     setCurrentDate(dateStr);
     navigate(`/schedule?date=${dateStr}`);
   };
 
-  const isToday = currentDate === new Date().toISOString().split('T')[0];
+  const isToday = currentDate === getTodayLocal();
 
   const getCurrentTimeSlot = () => {
     const now = new Date();
@@ -167,8 +180,9 @@ export default function SchedulePage() {
   const handleAddSchedule = async (timeSlot: string) => {
     if (!user || !newContent[timeSlot]?.trim()) return;
     const content = newContent[timeSlot].trim();
+    const tempId = Date.now().toString();
     const newItem: ScheduleItem = {
-      id: Date.now().toString(),
+      id: tempId,
       user_id: user.id,
       date: currentDate,
       time_slot: timeSlot,
@@ -182,16 +196,15 @@ export default function SchedulePage() {
       [timeSlot]: [...(prev[timeSlot] || []), newItem]
     }));
     setNewContent(prev => ({ ...prev, [timeSlot]: '' }));
-    const { error } = await supabase
-      .from('schedule')
-      .insert([{
-        user_id: user.id,
-        date: currentDate,
-        time_slot: timeSlot,
-        content,
-        is_completed: false
-      }])
-      .select();
+
+    const { error } = await supabase.from('schedule').insert([{
+      user_id: user.id,
+      date: currentDate,
+      time_slot: timeSlot,
+      content,
+      is_completed: false
+    }]);
+
     if (error) {
       fetchSchedules();
     }
@@ -200,7 +213,7 @@ export default function SchedulePage() {
   const handleToggleComplete = async (id: string, timeSlot: string, currentState: boolean) => {
     setSchedules(prev => ({
       ...prev,
-      [timeSlot]: prev[timeSlot].map(item => 
+      [timeSlot]: prev[timeSlot].map(item =>
         item.id === id ? { ...item, is_completed: !currentState } : item
       )
     }));
@@ -224,14 +237,15 @@ export default function SchedulePage() {
     }
     setSchedules(prev => ({
       ...prev,
-      [timeSlot]: prev[timeSlot].map(item => 
+      [timeSlot]: prev[timeSlot].map(item =>
         item.id === id ? { ...item, content: editContent } : item
       )
     }));
     setEditingId(null);
+
     const { error } = await supabase
       .from('schedule')
-      .update({ content: editContent })
+      .update({ content: editContent, updated_at: new Date().toISOString() })
       .eq('id', id);
     if (error) {
       fetchSchedules();
@@ -245,10 +259,8 @@ export default function SchedulePage() {
       [timeSlot]: prev[timeSlot].filter(item => item.id !== id)
     }));
     setShowConfirm(null);
-    const { error } = await supabase
-      .from('schedule')
-      .delete()
-      .eq('id', id);
+
+    const { error } = await supabase.from('schedule').delete().eq('id', id);
     if (error) {
       setSchedules(prev => ({ ...prev, [timeSlot]: originalItems }));
     }
@@ -266,6 +278,8 @@ export default function SchedulePage() {
     return TIME_BLOCKS.find(block => block.slots.includes(slot));
   };
 
+  if (!user) return null;
+
   return (
     <div className={`min-h-screen pb-56 ${theme === 'dark' ? 'bg-slate-900' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'}`}>
       <div className="p-4">
@@ -273,8 +287,8 @@ export default function SchedulePage() {
           <button
             onClick={toggleTheme}
             className={`p-3 rounded-2xl shadow-lg ${
-              theme === 'dark' 
-                ? 'bg-slate-800 text-yellow-400' 
+              theme === 'dark'
+                ? 'bg-slate-800 text-yellow-400'
                 : 'bg-white text-slate-700'
             }`}
           >
@@ -489,31 +503,31 @@ export default function SchedulePage() {
         </div>
       )}
 
-      <div className={`fixed bottom-0 left-0 right-0 ${theme === 'dark' ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-lg border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'} px-4 py-3 pb-8`}>
+      <div className={`fixed bottom-0 left-0 right-0 ${theme === 'dark' ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-lg border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'} px-4 py-2 pb-6`}>
         <div className="flex justify-around max-w-md mx-auto">
           <button
-            className="flex flex-col items-center gap-1 px-6 py-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+            className="flex flex-col items-center gap-1 px-6 py-1 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white"
           >
-            <span className="text-2xl">📖</span>
-            <span className="font-bold">微观</span>
+            <span className="text-xl">📖</span>
+            <span className="font-bold text-sm">微观</span>
           </button>
           <button
             onClick={navigateToCalendar}
-            className={`flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all ${
+            className={`flex flex-col items-center gap-1 px-6 py-1 rounded-2xl transition-all ${
               theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            <span className="text-2xl">📆</span>
-            <span className="font-medium">宏观</span>
+            <span className="text-xl">📆</span>
+            <span className="font-medium text-sm">宏观</span>
           </button>
           <button
             onClick={navigateToTodos}
-            className={`flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all ${
+            className={`flex flex-col items-center gap-1 px-6 py-1 rounded-2xl transition-all ${
               theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            <span className="text-2xl">✅</span>
-            <span className="font-medium">待办灵感</span>
+            <span className="text-xl">✅</span>
+            <span className="font-medium text-sm">待办灵感</span>
           </button>
         </div>
       </div>

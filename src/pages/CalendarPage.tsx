@@ -140,7 +140,7 @@ export default function CalendarPage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 dark:from-gray-900 dark:to-gray-800 pb-28">
+    <div className={`min-h-screen pb-16 ${theme === 'dark' ? 'bg-slate-900' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'}`}>
       <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 shadow-lg shadow-gray-200/30 dark:shadow-gray-900/30">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
@@ -300,28 +300,34 @@ export default function CalendarPage() {
         )}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border-t border-gray-200/50 dark:border-gray-700/50 shadow-2xl shadow-gray-200/50 dark:shadow-gray-900/50">
-        <div className="max-w-4xl mx-auto flex">
+      <div className={`fixed bottom-0 left-0 right-0 ${theme === 'dark' ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-lg border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'} px-4 py-2 pb-5`}>
+        <div className="flex justify-around max-w-md mx-auto">
           <button
             onClick={navigateToSchedulePage}
-            className="flex-1 py-4 text-center text-gray-500 dark:text-gray-400 font-bold hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
+            className={`flex flex-col items-center gap-0.5 px-6 py-1 rounded-xl transition-all ${
+              theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
+            }`}
           >
-            � 微观
+            <span className="text-lg">📖</span>
+            <span className="font-medium text-xs">微观</span>
           </button>
           <button
-            onClick={() => {}}
-            className="flex-1 py-4 text-center text-amber-600 dark:text-amber-400 font-bold border-t-4 border-amber-500 bg-gradient-to-b from-amber-50/50 to-transparent dark:from-amber-900/20"
+            className="flex flex-col items-center gap-0.5 px-6 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white"
           >
-            📆 宏观
+            <span className="text-lg">📆</span>
+            <span className="font-bold text-xs">宏观</span>
           </button>
           <button
             onClick={navigateToTodos}
-            className="flex-1 py-4 text-center text-gray-500 dark:text-gray-400 font-bold hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
+            className={`flex flex-col items-center gap-0.5 px-6 py-1 rounded-xl transition-all ${
+              theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
+            }`}
           >
-            ✅ 待办灵感
+            <span className="text-lg">✅</span>
+            <span className="font-medium text-xs">待办灵感</span>
           </button>
         </div>
-      </nav>
+      </div>
     </div>
   );
 }
