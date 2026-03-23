@@ -15,12 +15,41 @@ interface ScheduleItem {
   updated_at: string;
 }
 
-const TIME_SLOTS = [
-  '00:00-02:00', '02:00-04:00', '04:00-06:00', '06:00-08:00',
-  '08:00-10:00', '10:00-12:00', '12:00-14:00', '14:00-16:00',
-  '16:00-18:00', '18:00-20:00', '20:00-22:00', '22:00-24:00'
+interface TimeBlock {
+  name: string;
+  slots: string[];
+  color: string;
+}
+
+const TIME_BLOCKS: TimeBlock[] = [
+  {
+    name: '早上',
+    slots: ['08:00-12:00'],
+    color: 'from-yellow-400 to-amber-500'
+  },
+  {
+    name: '中午',
+    slots: ['12:00-14:00'],
+    color: 'from-orange-400 to-orange-600'
+  },
+  {
+    name: '下午',
+    slots: ['14:00-18:00'],
+    color: 'from-amber-400 to-yellow-600'
+  },
+  {
+    name: '晚上',
+    slots: ['18:00-24:00'],
+    color: 'from-indigo-500 to-purple-600'
+  },
+  {
+    name: '凌晨',
+    slots: ['00:00-08:00'],
+    color: 'from-blue-600 to-indigo-700'
+  }
 ];
 
+const ALL_SLOTS = TIME_BLOCKS.flatMap(block => block.slots);
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
 export default function SchedulePage() {
@@ -57,6 +86,19 @@ export default function SchedulePage() {
     }
   }, [dateParam]);
 
+  useEffect(() => {
+    if (!dateParam) {
+      const checkDate = () => {
+        const today = new Date().toISOString().split('T')[0];
+        if (currentDate !== today) {
+          setCurrentDate(today);
+        }
+      };
+      const interval = setInterval(checkDate, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [currentDate, dateParam]);
+
   const fetchSchedules = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -69,7 +111,7 @@ export default function SchedulePage() {
 
     if (!error && data) {
       const grouped: Record<string, ScheduleItem[]> = {};
-      TIME_SLOTS.forEach(slot => { grouped[slot] = []; });
+      ALL_SLOTS.forEach(slot => { grouped[slot] = []; });
       data.forEach((item: ScheduleItem) => {
         if (grouped[item.time_slot]) {
           grouped[item.time_slot].push(item);
@@ -84,363 +126,363 @@ export default function SchedulePage() {
     fetchSchedules();
   }, [fetchSchedules]);
 
+  const changeDate = (days: number) => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() + days);
+    const dateStr = newDate.toISOString().split('T')[0];
+    setCurrentDate(dateStr);
+    navigate(`/schedule?date=${dateStr}`);
+  };
+
+  const isToday = currentDate === new Date().toISOString().split('T')[0];
+
+  const getCurrentTimeSlot = () => {
+    const now = new Date();
+    const hours = now.getHours();
+    for (const slot of ALL_SLOTS) {
+      const [start] = slot.split('-');
+      const startHour = parseInt(start.split(':')[0]);
+      const endHour = startHour + (parseInt(slot.split('-')[1].split(':')[0]) - startHour);
+      if (hours >= startHour && hours < endHour) {
+        return slot;
+      }
+    }
+    return null;
+  };
+
+  const isPastTimeSlot = (slot: string) => {
+    if (!isToday) return false;
+    const now = new Date();
+    const [start] = slot.split('-');
+    const startHour = parseInt(start.split(':')[0]);
+    const endHour = startHour + (parseInt(slot.split('-')[1].split(':')[0]) - startHour);
+    return now.getHours() >= endHour;
+  };
+
+  const isCurrentTimeSlot = (slot: string) => {
+    if (!isToday) return false;
+    return getCurrentTimeSlot() === slot;
+  };
+
   const handleAddSchedule = async (timeSlot: string) => {
     if (!user || !newContent[timeSlot]?.trim()) return;
-
-    const tempId = Date.now().toString();
+    const content = newContent[timeSlot].trim();
     const newItem: ScheduleItem = {
-      id: tempId,
+      id: Date.now().toString(),
       user_id: user.id,
       date: currentDate,
       time_slot: timeSlot,
-      content: newContent[timeSlot].trim(),
+      content,
       is_completed: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
-
     setSchedules(prev => ({
       ...prev,
       [timeSlot]: [...(prev[timeSlot] || []), newItem]
     }));
     setNewContent(prev => ({ ...prev, [timeSlot]: '' }));
-
-    const { error } = await supabase.from('schedule').insert({
-      user_id: user.id,
-      date: currentDate,
-      time_slot: timeSlot,
-      content: newItem.content,
-      is_completed: false
-    });
-
+    const { data, error } = await supabase
+      .from('schedule')
+      .insert([{
+        user_id: user.id,
+        date: currentDate,
+        time_slot: timeSlot,
+        content,
+        is_completed: false
+      }])
+      .select();
     if (error) {
-      setSchedules(prev => ({
-        ...prev,
-        [timeSlot]: (prev[timeSlot] || []).filter(item => item.id !== tempId)
-      }));
+      fetchSchedules();
+    }
+  };
+
+  const handleToggleComplete = async (id: string, timeSlot: string, currentState: boolean) => {
+    setSchedules(prev => ({
+      ...prev,
+      [timeSlot]: prev[timeSlot].map(item => 
+        item.id === id ? { ...item, is_completed: !currentState } : item
+      )
+    }));
+    const { error } = await supabase
+      .from('schedule')
+      .update({ is_completed: !currentState })
+      .eq('id', id);
+    if (error) {
+      fetchSchedules();
     }
   };
 
   const handleUpdateSchedule = async (id: string) => {
     let originalContent = '';
-    
-    for (const slot of Object.keys(schedules)) {
+    let timeSlot = '';
+    for (const slot of ALL_SLOTS) {
       const item = schedules[slot]?.find(i => i.id === id);
       if (item) {
         originalContent = item.content;
+        timeSlot = slot;
         break;
       }
     }
-
-    setSchedules(prev => {
-      const newSchedules = { ...prev };
-      for (const slot of Object.keys(newSchedules)) {
-        newSchedules[slot] = newSchedules[slot].map(item => 
-          item.id === id ? { ...item, content: editContent } : item
-        );
-      }
-      return newSchedules;
-    });
+    setSchedules(prev => ({
+      ...prev,
+      [timeSlot]: prev[timeSlot].map(item => 
+        item.id === id ? { ...item, content: editContent } : item
+      )
+    }));
     setEditingId(null);
-    setEditContent('');
-
     const { error } = await supabase
       .from('schedule')
-      .update({ content: editContent, updated_at: new Date().toISOString() })
+      .update({ content: editContent })
       .eq('id', id);
-
-    if (error && originalContent) {
-      setSchedules(prev => {
-        const newSchedules = { ...prev };
-        for (const slot of Object.keys(newSchedules)) {
-          newSchedules[slot] = newSchedules[slot].map(item => 
-            item.id === id ? { ...item, content: originalContent } : item
-          );
-        }
-        return newSchedules;
-      });
+    if (error) {
+      fetchSchedules();
     }
   };
 
-  const handleDeleteSchedule = async (id: string) => {
-    let deletedSlot: string | null = null;
-    let deletedItem: ScheduleItem | null = null;
-    
-    for (const slot of Object.keys(schedules)) {
-      const item = schedules[slot]?.find(i => i.id === id);
-      if (item) {
-        deletedSlot = slot;
-        deletedItem = item;
-        break;
-      }
-    }
-
+  const handleDeleteSchedule = async (id: string, timeSlot: string) => {
+    const originalItems = [...(schedules[timeSlot] || [])];
+    setSchedules(prev => ({
+      ...prev,
+      [timeSlot]: prev[timeSlot].filter(item => item.id !== id)
+    }));
     setShowConfirm(null);
-    if (deletedSlot) {
-      setSchedules(prev => ({
-        ...prev,
-        [deletedSlot]: (prev[deletedSlot] || []).filter(item => item.id !== id)
-      }));
-    }
-
-    const { error } = await supabase.from('schedule').delete().eq('id', id);
-
-    if (error && deletedSlot && deletedItem) {
-      setSchedules(prev => ({
-        ...prev,
-        [deletedSlot]: [...(prev[deletedSlot] || []), deletedItem]
-      }));
-    }
-  };
-
-  const handleToggleComplete = async (item: ScheduleItem) => {
-    setSchedules(prev => {
-      const newSchedules = { ...prev };
-      for (const slot of Object.keys(newSchedules)) {
-        newSchedules[slot] = newSchedules[slot].map(i => 
-          i.id === item.id ? { ...i, is_completed: !i.is_completed } : i
-        );
-      }
-      return newSchedules;
-    });
-
     const { error } = await supabase
       .from('schedule')
-      .update({ is_completed: !item.is_completed, updated_at: new Date().toISOString() })
-      .eq('id', item.id);
-
+      .delete()
+      .eq('id', id);
     if (error) {
-      setSchedules(prev => {
-        const newSchedules = { ...prev };
-        for (const slot of Object.keys(newSchedules)) {
-          newSchedules[slot] = newSchedules[slot].map(i => 
-            i.id === item.id ? { ...i, is_completed: item.is_completed } : i
-          );
-        }
-        return newSchedules;
-      });
+      setSchedules(prev => ({ ...prev, [timeSlot]: originalItems }));
     }
-  };
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/auth');
-  };
-
-  const changeDate = (days: number) => {
-    const newDate = new Date(new Date(currentDate).getTime() + days * 86400000);
-    setCurrentDate(newDate.toISOString().split('T')[0]);
-  };
-
-  const getCurrentTimeSlot = () => {
-    const now = new Date();
-    const hour = now.getHours();
-    return `${hour.toString().padStart(2, '0')}:00-${(hour + 2).toString().padStart(2, '0')}:00`;
-  };
-
-  const isPastSlot = (timeSlot: string) => {
-    const now = new Date();
-    const currentHour = now.getHours();
-    const [start] = timeSlot.split('-').map(t => parseInt(t.split(':')[0]));
-    return start < currentHour;
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return `${date.getMonth() + 1}月${date.getDate()}日 ${WEEKDAYS[date.getDay()]}`;
+    const date = new Date(dateStr + 'T00:00:00');
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const weekday = WEEKDAYS[date.getDay()];
+    return `${month}月${day}日 ${weekday}`;
   };
 
-  if (!user) return null;
+  const getTimeBlockBySlot = (slot: string) => {
+    return TIME_BLOCKS.find(block => block.slots.includes(slot));
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 dark:from-gray-900 dark:to-gray-800 pb-28">
-      <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 shadow-lg shadow-gray-200/30 dark:shadow-gray-900/30">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={toggleTheme}
-              className="p-3 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 shadow-md hover:shadow-lg active:shadow-sm transition-all duration-200"
-              aria-label="切换主题"
-            >
-              {theme === 'light' ? '🌙' : '☀️'}
-            </button>
-            <button
-              onClick={handleSignOut}
-              className="px-5 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-red-500 transition-colors"
-            >
-              退出登录
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => changeDate(-1)}
-              className="p-3 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 shadow-md hover:shadow-lg active:shadow-sm transition-all duration-200"
-            >
-              ←
-            </button>
-            <div className="text-center">
-              <div className="text-xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent dark:from-amber-400 dark:to-orange-400">
-                {formatDate(currentDate)}
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                {currentDate === new Date().toISOString().split('T')[0] ? '✨ 今天' : currentDate}
-              </div>
-            </div>
-            <button
-              onClick={() => changeDate(1)}
-              className="p-3 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 shadow-md hover:shadow-lg active:shadow-sm transition-all duration-200"
-            >
-              →
-            </button>
-          </div>
+    <div className={`min-h-screen pb-56 ${theme === 'dark' ? 'bg-slate-900' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'}`}>
+      <div className="p-4">
+        <div className="flex justify-between items-center mb-6">
+          <button
+            onClick={toggleTheme}
+            className={`p-3 rounded-2xl shadow-lg ${
+              theme === 'dark' 
+                ? 'bg-slate-800 text-yellow-400' 
+                : 'bg-white text-slate-700'
+            }`}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+          <button
+            onClick={signOut}
+            className={`px-4 py-2 rounded-xl font-medium ${
+              theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-800'
+            }`}
+          >
+            退出登录
+          </button>
         </div>
-      </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <button
+            onClick={() => changeDate(-1)}
+            className={`p-4 rounded-3xl shadow-xl ${
+              theme === 'dark' ? 'bg-slate-800 text-white' : 'bg-white'
+            }`}
+          >
+            ←
+          </button>
+          <div className="text-center">
+            <h1 className={`text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent`}>
+              {formatDate(currentDate)}
+            </h1>
+            {isToday && (
+              <p className="text-amber-500 mt-2 font-medium">✨ 今天</p>
+            )}
+          </div>
+          <button
+            onClick={() => changeDate(1)}
+            className={`p-4 rounded-3xl shadow-xl ${
+              theme === 'dark' ? 'bg-slate-800 text-white' : 'bg-white'
+            }`}
+          >
+            →
+          </button>
+        </div>
+
         {loading ? (
-          <div className="text-center py-16 text-gray-500 dark:text-gray-400">
-            <div className="text-4xl mb-4">⏳</div>
-            <div className="text-lg">加载中...</div>
+          <div className="flex justify-center py-12">
+            <div className="animate-spin text-4xl">⏳</div>
           </div>
         ) : (
-          <div className="space-y-4">
-            {TIME_SLOTS.map((timeSlot) => {
-              const isCurrent = timeSlot === getCurrentTimeSlot() && currentDate === new Date().toISOString().split('T')[0];
-              const isPast = isPastSlot(timeSlot);
-              const items = schedules[timeSlot] || [];
+          <div className="space-y-6">
+            {TIME_BLOCKS.map((block) => (
+              <div key={block.name} className="space-y-3">
+                <h2 className={`text-xl font-bold px-2 ${
+                  theme === 'dark' ? 'text-slate-200' : 'text-slate-700'
+                }`}>
+                  {block.name}
+                </h2>
+                {block.slots.map((timeSlot) => {
+                  const timeBlock = getTimeBlockBySlot(timeSlot);
+                  return (
+                    <div
+                      key={timeSlot}
+                      className={`p-6 rounded-3xl shadow-xl transition-all ${
+                        isCurrentTimeSlot(timeSlot)
+                          ? 'ring-4 ring-amber-400 scale-[1.02] bg-gradient-to-r from-amber-100 to-orange-100'
+                          : isPastTimeSlot(timeSlot)
+                          ? 'opacity-60'
+                          : ''
+                      } ${theme === 'dark' ? 'bg-slate-800' : 'bg-white'}`}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <span className={`text-xl font-bold bg-gradient-to-r ${timeBlock?.color} bg-clip-text text-transparent`}>
+                          {timeSlot}
+                        </span>
+                        {isCurrentTimeSlot(timeSlot) && (
+                          <span className="px-4 py-1 bg-green-400 text-green-900 rounded-full text-sm font-bold">
+                            🎯 当前时段
+                          </span>
+                        )}
+                      </div>
 
-              return (
-                <div
-                  key={timeSlot}
-                  className={`bg-white dark:bg-gray-800 rounded-3xl p-5 shadow-lg shadow-gray-200/50 dark:shadow-gray-900/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 ${
-                    isCurrent ? 'ring-4 ring-amber-400/50 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20' : ''
-                  } ${isPast ? 'opacity-70' : ''}`}
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={`px-4 py-1.5 rounded-2xl font-bold text-sm ${
-                      isCurrent 
-                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30' 
-                        : 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 text-gray-700 dark:text-gray-300'
-                    }`}>
-                      {timeSlot}
-                    </div>
-                    {isCurrent && (
-                      <span className="px-3 py-1 text-xs font-medium bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full shadow-md shadow-green-500/30 animate-pulse">
-                        🎯 当前时段
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="space-y-3">
-                    {items.map((item) => (
-                      <div
-                        key={item.id}
-                        className={`flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 ${
-                          item.is_completed 
-                            ? 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800' 
-                            : 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 shadow-md'
-                        }`}
-                      >
-                        <button
-                          onClick={() => handleToggleComplete(item)}
-                          className={`w-6 h-6 rounded-xl border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 shadow-sm ${
-                            item.is_completed 
-                              ? 'bg-gradient-to-br from-green-500 to-emerald-500 border-green-500 text-white shadow-md shadow-green-500/30' 
-                              : 'border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 hover:border-amber-400'
-                          }`}
-                        >
-                          {item.is_completed && '✓'}
-                        </button>
-
-                        {editingId === item.id ? (
-                          <div className="flex-1 flex gap-2">
-                            <input
-                              type="text"
-                              value={editContent}
-                              onChange={(e) => setEditContent(e.target.value)}
-                              className="flex-1 px-3 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-md focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none"
-                              autoFocus
-                            />
+                      <div className="space-y-3 mb-4">
+                        {schedules[timeSlot]?.map((item) => (
+                          <div
+                            key={item.id}
+                            className={`p-4 rounded-2xl flex items-center gap-3 ${
+                              item.is_completed
+                                ? 'bg-green-100 text-green-700'
+                                : theme === 'dark'
+                                ? 'bg-slate-700'
+                                : 'bg-slate-50'
+                            }`}
+                          >
                             <button
-                              onClick={() => handleUpdateSchedule(item.id)}
-                              className="px-4 py-2 text-xs font-medium bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl shadow-md hover:shadow-lg active:shadow-sm transition-all"
+                              onClick={() => handleToggleComplete(item.id, timeSlot, item.is_completed)}
+                              className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                                item.is_completed
+                                  ? 'bg-green-500 text-white'
+                                  : 'bg-white border-2 border-slate-300'
+                              }`}
                             >
-                              保存
+                              {item.is_completed && '✓'}
                             </button>
-                            <button
-                              onClick={() => setEditingId(null)}
-                              className="px-4 py-2 text-xs font-medium bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-xl shadow-md hover:shadow-lg active:shadow-sm transition-all"
-                            >
-                              取消
-                            </button>
-                          </div>
-                        ) : (
-                          <>
-                            <span className={`flex-1 text-sm font-medium ${
-                              item.is_completed 
-                                ? 'line-through text-gray-400 dark:text-gray-500' 
-                                : 'text-gray-800 dark:text-gray-200'
-                            }`}>
-                              {item.content}
-                            </span>
-                            <button
-                              onClick={() => { setEditingId(item.id); setEditContent(item.content); }}
-                              className="p-2 text-gray-400 hover:text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-xl transition-all"
-                            >
-                              ✏️
-                            </button>
+                            {editingId === item.id ? (
+                              <>
+                                <input
+                                  type="text"
+                                  value={editContent}
+                                  onChange={(e) => setEditContent(e.target.value)}
+                                  onBlur={() => handleUpdateSchedule(item.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleUpdateSchedule(item.id);
+                                    if (e.key === 'Escape') setEditingId(null);
+                                  }}
+                                  autoFocus
+                                  className={`flex-1 px-3 py-2 rounded-xl ${
+                                    theme === 'dark' ? 'bg-slate-600 text-white' : 'bg-white'
+                                  }`}
+                                />
+                              </>
+                            ) : (
+                              <span className={`flex-1 ${item.is_completed ? 'line-through' : ''}`}>
+                                {item.content}
+                              </span>
+                            )}
+                            {!item.is_completed && editingId !== item.id && (
+                              <button
+                                onClick={() => {
+                                  setEditingId(item.id);
+                                  setEditContent(item.content);
+                                }}
+                                className="text-slate-500 hover:text-blue-500"
+                              >
+                                ✏️
+                              </button>
+                            )}
                             <button
                               onClick={() => setShowConfirm(item.id)}
-                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-xl transition-all"
+                              className="text-slate-500 hover:text-red-500"
                             >
                               🗑️
                             </button>
-                          </>
-                        )}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
 
-                  <div className="mt-4 flex gap-3">
-                    <input
-                      type="text"
-                      value={newContent[timeSlot] || ''}
-                      onChange={(e) => setNewContent(prev => ({ ...prev, [timeSlot]: e.target.value }))}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddSchedule(timeSlot)}
-                      placeholder="添加事项..."
-                      className="flex-1 px-4 py-3 text-sm rounded-2xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 shadow-md focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
-                    />
-                    <button
-                      onClick={() => handleAddSchedule(timeSlot)}
-                      className="px-5 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-bold rounded-2xl shadow-md shadow-amber-500/30 hover:shadow-lg active:shadow-sm transition-all duration-200"
-                    >
-                      添加
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                      <div className="flex gap-3">
+                        <input
+                          type="text"
+                          value={newContent[timeSlot] || ''}
+                          onChange={(e) => setNewContent(prev => ({ ...prev, [timeSlot]: e.target.value }))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleAddSchedule(timeSlot);
+                          }}
+                          placeholder="添加事项..."
+                          className={`flex-1 px-4 py-3 rounded-2xl shadow-inner ${
+                            theme === 'dark'
+                              ? 'bg-slate-700 text-white placeholder-slate-400'
+                              : 'bg-slate-50 placeholder-slate-400'
+                          }`}
+                        />
+                        <button
+                          onClick={() => handleAddSchedule(timeSlot)}
+                          className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl font-bold shadow-lg hover:scale-105 transition-transform"
+                        >
+                          添加
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         )}
-      </main>
+      </div>
 
       {showConfirm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 m-4 max-w-sm w-full shadow-2xl">
-            <div className="text-5xl mb-4 text-center">⚠️</div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 text-center">确认删除</h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-8 text-center">确定要删除这个事项吗？</p>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`p-8 rounded-3xl w-full max-w-sm ${theme === 'dark' ? 'bg-slate-800' : 'bg-white'}`}>
+            <div className="text-center mb-6">
+              <div className="text-6xl mb-4">⚠️</div>
+              <h2 className="text-2xl font-bold mb-2">确认删除</h2>
+              <p className={`${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                确定要删除这个事项吗？
+              </p>
+            </div>
             <div className="flex gap-4">
               <button
                 onClick={() => setShowConfirm(null)}
-                className="flex-1 py-3 px-4 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 text-gray-800 dark:text-white font-bold rounded-2xl shadow-md hover:shadow-lg active:shadow-sm transition-all"
+                className={`flex-1 py-3 rounded-2xl font-bold ${
+                  theme === 'dark' ? 'bg-slate-700' : 'bg-slate-100'
+                }`}
               >
                 取消
               </button>
               <button
-                onClick={() => handleDeleteSchedule(showConfirm)}
-                className="flex-1 py-3 px-4 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white font-bold rounded-2xl shadow-md shadow-red-500/30 hover:shadow-lg active:shadow-sm transition-all"
+                onClick={() => {
+                  let timeSlot = '';
+                  for (const slot of ALL_SLOTS) {
+                    if (schedules[slot]?.find(i => i.id === showConfirm)) {
+                      timeSlot = slot;
+                      break;
+                    }
+                  }
+                  handleDeleteSchedule(showConfirm, timeSlot);
+                }}
+                className="flex-1 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-2xl font-bold"
               >
                 删除
               </button>
@@ -449,28 +491,34 @@ export default function SchedulePage() {
         </div>
       )}
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border-t border-gray-200/50 dark:border-gray-700/50 shadow-2xl shadow-gray-200/50 dark:shadow-gray-900/50">
-        <div className="max-w-4xl mx-auto flex">
+      <div className={`fixed bottom-0 left-0 right-0 ${theme === 'dark' ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-lg border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'} px-4 py-3 pb-8`}>
+        <div className="flex justify-around max-w-md mx-auto">
           <button
-            onClick={() => {}}
-            className="flex-1 py-4 text-center text-amber-600 dark:text-amber-400 font-bold border-t-4 border-amber-500 bg-gradient-to-b from-amber-50/50 to-transparent dark:from-amber-900/20"
+            className="flex flex-col items-center gap-1 px-6 py-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white"
           >
-            📖 微观
+            <span className="text-2xl">📖</span>
+            <span className="font-bold">微观</span>
           </button>
           <button
             onClick={navigateToCalendar}
-            className="flex-1 py-4 text-center text-gray-500 dark:text-gray-400 font-bold hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
+            className={`flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all ${
+              theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
+            }`}
           >
-            📆 宏观
+            <span className="text-2xl">📆</span>
+            <span className="font-medium">宏观</span>
           </button>
           <button
             onClick={navigateToTodos}
-            className="flex-1 py-4 text-center text-gray-500 dark:text-gray-400 font-bold hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
+            className={`flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all ${
+              theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
+            }`}
           >
-            ✅ 待办灵感
+            <span className="text-2xl">✅</span>
+            <span className="font-medium">待办灵感</span>
           </button>
         </div>
-      </nav>
+      </div>
     </div>
   );
 }
