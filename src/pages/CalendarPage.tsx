@@ -306,13 +306,13 @@ export default function CalendarPage() {
             onClick={navigateToSchedulePage}
             className="flex-1 py-4 text-center text-gray-500 dark:text-gray-400 font-bold hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
           >
-            📅 日程规划
+            � 微观
           </button>
           <button
             onClick={() => {}}
             className="flex-1 py-4 text-center text-amber-600 dark:text-amber-400 font-bold border-t-4 border-amber-500 bg-gradient-to-b from-amber-50/50 to-transparent dark:from-amber-900/20"
           >
-            📆 日历视图
+            📆 宏观
           </button>
           <button
             onClick={navigateToTodos}

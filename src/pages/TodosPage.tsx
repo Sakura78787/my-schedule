@@ -547,13 +547,13 @@ export default function TodosPage() {
             onClick={navigateToSchedule}
             className="flex-1 py-4 text-center text-gray-500 dark:text-gray-400 font-bold hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
           >
-            📅 日程规划
+            � 微观
           </button>
           <button
             onClick={navigateToCalendar}
             className="flex-1 py-4 text-center text-gray-500 dark:text-gray-400 font-bold hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
           >
-            📆 日历视图
+            📆 宏观
           </button>
           <button
             onClick={() => {}}

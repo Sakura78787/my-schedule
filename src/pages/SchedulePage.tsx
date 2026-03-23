@@ -118,15 +118,21 @@ export default function SchedulePage() {
         ...prev,
         [timeSlot]: (prev[timeSlot] || []).filter(item => item.id !== tempId)
       }));
-    } else {
-      fetchSchedules();
     }
   };
 
   const handleUpdateSchedule = async (id: string) => {
-    const originalContent = schedules[Object.keys(schedules).find(slot => 
-      schedules[slot]?.some(item => item.id === id)
-    ) || '']?.find(item => item.id === id)?.content;
+    let originalContent = '';
+    let originalSlot = '';
+    
+    for (const slot of Object.keys(schedules)) {
+      const item = schedules[slot]?.find(i => i.id === id);
+      if (item) {
+        originalContent = item.content;
+        originalSlot = slot;
+        break;
+      }
+    }
 
     setSchedules(prev => {
       const newSchedules = { ...prev };
@@ -414,30 +420,6 @@ export default function SchedulePage() {
                       添加
                     </button>
                   </div>
-
-                  {showConfirm && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-                      <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 m-4 max-w-sm w-full shadow-2xl">
-                        <div className="text-5xl mb-4 text-center">⚠️</div>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 text-center">确认删除</h3>
-                        <p className="text-gray-600 dark:text-gray-400 mb-8 text-center">确定要删除这个事项吗？</p>
-                        <div className="flex gap-4">
-                          <button
-                            onClick={() => setShowConfirm(null)}
-                            className="flex-1 py-3 px-4 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 text-gray-800 dark:text-white font-bold rounded-2xl shadow-md hover:shadow-lg active:shadow-sm transition-all"
-                          >
-                            取消
-                          </button>
-                          <button
-                            onClick={() => handleDeleteSchedule(showConfirm)}
-                            className="flex-1 py-3 px-4 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white font-bold rounded-2xl shadow-md shadow-red-500/30 hover:shadow-lg active:shadow-sm transition-all"
-                          >
-                            删除
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -445,19 +427,43 @@ export default function SchedulePage() {
         )}
       </main>
 
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 m-4 max-w-sm w-full shadow-2xl">
+            <div className="text-5xl mb-4 text-center">⚠️</div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 text-center">确认删除</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-8 text-center">确定要删除这个事项吗？</p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowConfirm(null)}
+                className="flex-1 py-3 px-4 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 text-gray-800 dark:text-white font-bold rounded-2xl shadow-md hover:shadow-lg active:shadow-sm transition-all"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => handleDeleteSchedule(showConfirm)}
+                className="flex-1 py-3 px-4 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white font-bold rounded-2xl shadow-md shadow-red-500/30 hover:shadow-lg active:shadow-sm transition-all"
+              >
+                删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <nav className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border-t border-gray-200/50 dark:border-gray-700/50 shadow-2xl shadow-gray-200/50 dark:shadow-gray-900/50">
         <div className="max-w-4xl mx-auto flex">
           <button
             onClick={() => {}}
             className="flex-1 py-4 text-center text-amber-600 dark:text-amber-400 font-bold border-t-4 border-amber-500 bg-gradient-to-b from-amber-50/50 to-transparent dark:from-amber-900/20"
           >
-            📅 日程规划
+            📖 微观
           </button>
           <button
             onClick={navigateToCalendar}
             className="flex-1 py-4 text-center text-gray-500 dark:text-gray-400 font-bold hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
           >
-            📆 日历视图
+            📆 宏观
           </button>
           <button
             onClick={navigateToTodos}
