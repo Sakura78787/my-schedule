@@ -87,45 +87,135 @@ export default function SchedulePage() {
   const handleAddSchedule = async (timeSlot: string) => {
     if (!user || !newContent[timeSlot]?.trim()) return;
 
-    const { error } = await supabase.from('schedule').insert({
+    const tempId = Date.now().toString();
+    const newItem: ScheduleItem = {
+      id: tempId,
       user_id: user.id,
       date: currentDate,
       time_slot: timeSlot,
       content: newContent[timeSlot].trim(),
+      is_completed: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    setSchedules(prev => ({
+      ...prev,
+      [timeSlot]: [...(prev[timeSlot] || []), newItem]
+    }));
+    setNewContent(prev => ({ ...prev, [timeSlot]: '' }));
+
+    const { error } = await supabase.from('schedule').insert({
+      user_id: user.id,
+      date: currentDate,
+      time_slot: timeSlot,
+      content: newItem.content,
       is_completed: false
     });
 
-    if (!error) {
-      setNewContent(prev => ({ ...prev, [timeSlot]: '' }));
+    if (error) {
+      setSchedules(prev => ({
+        ...prev,
+        [timeSlot]: (prev[timeSlot] || []).filter(item => item.id !== tempId)
+      }));
+    } else {
       fetchSchedules();
     }
   };
 
   const handleUpdateSchedule = async (id: string) => {
+    const originalContent = schedules[Object.keys(schedules).find(slot => 
+      schedules[slot]?.some(item => item.id === id)
+    ) || '']?.find(item => item.id === id)?.content;
+
+    setSchedules(prev => {
+      const newSchedules = { ...prev };
+      for (const slot of Object.keys(newSchedules)) {
+        newSchedules[slot] = newSchedules[slot].map(item => 
+          item.id === id ? { ...item, content: editContent } : item
+        );
+      }
+      return newSchedules;
+    });
+    setEditingId(null);
+    setEditContent('');
+
     const { error } = await supabase
       .from('schedule')
       .update({ content: editContent, updated_at: new Date().toISOString() })
       .eq('id', id);
 
-    if (!error) {
-      setEditingId(null);
-      setEditContent('');
-      fetchSchedules();
+    if (error && originalContent) {
+      setSchedules(prev => {
+        const newSchedules = { ...prev };
+        for (const slot of Object.keys(newSchedules)) {
+          newSchedules[slot] = newSchedules[slot].map(item => 
+            item.id === id ? { ...item, content: originalContent } : item
+          );
+        }
+        return newSchedules;
+      });
     }
   };
 
   const handleDeleteSchedule = async (id: string) => {
-    await supabase.from('schedule').delete().eq('id', id);
+    let deletedSlot: string | null = null;
+    let deletedItem: ScheduleItem | null = null;
+    
+    for (const slot of Object.keys(schedules)) {
+      const item = schedules[slot]?.find(i => i.id === id);
+      if (item) {
+        deletedSlot = slot;
+        deletedItem = item;
+        break;
+      }
+    }
+
     setShowConfirm(null);
-    fetchSchedules();
+    if (deletedSlot) {
+      setSchedules(prev => ({
+        ...prev,
+        [deletedSlot]: (prev[deletedSlot] || []).filter(item => item.id !== id)
+      }));
+    }
+
+    const { error } = await supabase.from('schedule').delete().eq('id', id);
+
+    if (error && deletedSlot && deletedItem) {
+      setSchedules(prev => ({
+        ...prev,
+        [deletedSlot]: [...(prev[deletedSlot] || []), deletedItem]
+      }));
+    }
   };
 
   const handleToggleComplete = async (item: ScheduleItem) => {
-    await supabase
+    setSchedules(prev => {
+      const newSchedules = { ...prev };
+      for (const slot of Object.keys(newSchedules)) {
+        newSchedules[slot] = newSchedules[slot].map(i => 
+          i.id === item.id ? { ...i, is_completed: !i.is_completed } : i
+        );
+      }
+      return newSchedules;
+    });
+
+    const { error } = await supabase
       .from('schedule')
       .update({ is_completed: !item.is_completed, updated_at: new Date().toISOString() })
       .eq('id', item.id);
-    fetchSchedules();
+
+    if (error) {
+      setSchedules(prev => {
+        const newSchedules = { ...prev };
+        for (const slot of Object.keys(newSchedules)) {
+          newSchedules[slot] = newSchedules[slot].map(i => 
+            i.id === item.id ? { ...i, is_completed: item.is_completed } : i
+          );
+        }
+        return newSchedules;
+      });
+    }
   };
 
   const handleSignOut = async () => {
@@ -159,7 +249,7 @@ export default function SchedulePage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 dark:from-gray-900 dark:to-gray-800 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 dark:from-gray-900 dark:to-gray-800 pb-28">
       <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 shadow-lg shadow-gray-200/30 dark:shadow-gray-900/30">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
@@ -367,7 +457,7 @@ export default function SchedulePage() {
             onClick={navigateToCalendar}
             className="flex-1 py-4 text-center text-gray-500 dark:text-gray-400 font-bold hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
           >
-            � 日历视图
+            📆 日历视图
           </button>
           <button
             onClick={navigateToTodos}

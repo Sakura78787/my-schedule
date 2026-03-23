@@ -82,64 +82,134 @@ export default function TodosPage() {
   const handleAddTodo = async () => {
     if (!user || !newContent.trim()) return;
 
-    const { error } = await supabase.from('todo').insert({
+    const tempId = Date.now().toString();
+    const newItem: TodoItem = {
+      id: tempId,
       user_id: user.id,
       content: newContent.trim(),
       remark: newRemark.trim() || null,
       priority: newPriority,
       is_completed: false,
+      is_archived: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    setTodos(prev => [newItem, ...prev]);
+    setNewContent('');
+    setNewRemark('');
+    setNewPriority('medium');
+
+    const { error } = await supabase.from('todo').insert({
+      user_id: user.id,
+      content: newItem.content,
+      remark: newItem.remark,
+      priority: newItem.priority,
+      is_completed: false,
       is_archived: false
     });
 
-    if (!error) {
-      setNewContent('');
-      setNewRemark('');
-      setNewPriority('medium');
+    if (error) {
+      setTodos(prev => prev.filter(item => item.id !== tempId));
+    } else {
       fetchTodos();
     }
   };
 
   const handleUpdateTodo = async (id: string) => {
+    const originalContent = todos.find(t => t.id === id)?.content;
+
+    setTodos(prev => prev.map(item => 
+      item.id === id ? { ...item, content: editContent } : item
+    ));
+    setEditingId(null);
+    setEditContent('');
+
     const { error } = await supabase
       .from('todo')
       .update({ content: editContent, updated_at: new Date().toISOString() })
       .eq('id', id);
 
-    if (!error) {
-      setEditingId(null);
-      setEditContent('');
-      fetchTodos();
+    if (error && originalContent) {
+      setTodos(prev => prev.map(item => 
+        item.id === id ? { ...item, content: originalContent } : item
+      ));
     }
   };
 
   const handleDeleteTodo = async (id: string) => {
-    await supabase.from('todo').delete().eq('id', id);
+    const deletedItem = todos.find(t => t.id === id) || archivedTodos.find(t => t.id === id);
+    const isArchived = archivedTodos.some(t => t.id === id);
+
     setShowConfirm(null);
-    fetchTodos();
+    if (isArchived) {
+      setArchivedTodos(prev => prev.filter(item => item.id !== id));
+    } else {
+      setTodos(prev => prev.filter(item => item.id !== id));
+    }
+
+    const { error } = await supabase.from('todo').delete().eq('id', id);
+
+    if (error && deletedItem) {
+      if (isArchived) {
+        setArchivedTodos(prev => [...prev, deletedItem]);
+      } else {
+        setTodos(prev => [...prev, deletedItem]);
+      }
+    }
   };
 
   const handleToggleComplete = async (item: TodoItem) => {
-    await supabase
+    setTodos(prev => prev.map(t => 
+      t.id === item.id ? { ...t, is_completed: !t.is_completed } : t
+    ));
+
+    const { error } = await supabase
       .from('todo')
       .update({ is_completed: !item.is_completed, updated_at: new Date().toISOString() })
       .eq('id', item.id);
-    fetchTodos();
+
+    if (error) {
+      setTodos(prev => prev.map(t => 
+        t.id === item.id ? { ...t, is_completed: item.is_completed } : t
+      ));
+    }
   };
 
   const handleArchive = async (id: string) => {
-    await supabase
+    const archivedItem = todos.find(t => t.id === id);
+    if (!archivedItem) return;
+
+    setTodos(prev => prev.filter(item => item.id !== id));
+    setArchivedTodos(prev => [{ ...archivedItem, is_archived: true }, ...prev]);
+
+    const { error } = await supabase
       .from('todo')
       .update({ is_archived: true, updated_at: new Date().toISOString() })
       .eq('id', id);
-    fetchTodos();
+
+    if (error) {
+      setTodos(prev => [...prev, archivedItem]);
+      setArchivedTodos(prev => prev.filter(item => item.id !== id));
+    }
   };
 
   const handleRestore = async (id: string) => {
-    await supabase
+    const restoredItem = archivedTodos.find(t => t.id === id);
+    if (!restoredItem) return;
+
+    setArchivedTodos(prev => prev.filter(item => item.id !== id));
+    setTodos(prev => [{ ...restoredItem, is_archived: false }, ...prev]);
+
+    const { error } = await supabase
       .from('todo')
       .update({ is_archived: false, updated_at: new Date().toISOString() })
       .eq('id', id);
-    fetchTodos();
+
+    if (error) {
+      setArchivedTodos(prev => [...prev, restoredItem]);
+      setTodos(prev => prev.filter(item => item.id !== id));
+    }
   };
 
   const filteredTodos = todos.filter(todo => {
@@ -166,7 +236,7 @@ export default function TodosPage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 dark:from-gray-900 dark:to-gray-800 pb-32">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 dark:from-gray-900 dark:to-gray-800 pb-40">
       <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 shadow-lg shadow-gray-200/30 dark:shadow-gray-900/30">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">

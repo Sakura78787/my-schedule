@@ -66,18 +66,18 @@ export default function CalendarPage() {
 
     for (let i = startPadding - 1; i >= 0; i--) {
       const d = new Date(year, month, -i);
-      days.push({ date: d, isCurrentMonth: false, dateStr: d.toISOString().split('T')[0] });
+      days.push({ date: d, isCurrentMonth: false, dateStr: formatDateString(d) });
     }
 
     for (let i = 1; i <= lastDay.getDate(); i++) {
       const d = new Date(year, month, i);
-      days.push({ date: d, isCurrentMonth: true, dateStr: d.toISOString().split('T')[0] });
+      days.push({ date: d, isCurrentMonth: true, dateStr: formatDateString(d) });
     }
 
     const remaining = 42 - days.length;
     for (let i = 1; i <= remaining; i++) {
       const d = new Date(year, month + 1, i);
-      days.push({ date: d, isCurrentMonth: false, dateStr: d.toISOString().split('T')[0] });
+      days.push({ date: d, isCurrentMonth: false, dateStr: formatDateString(d) });
     }
 
     fetchScheduleCounts(
@@ -88,6 +88,13 @@ export default function CalendarPage() {
     return days;
   }, [currentMonth, fetchScheduleCounts]);
 
+  const formatDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const weekData = useMemo(() => {
     const today = new Date();
     const startOfWeek = new Date(today);
@@ -97,7 +104,7 @@ export default function CalendarPage() {
     for (let i = 0; i < 7; i++) {
       const d = new Date(startOfWeek);
       d.setDate(startOfWeek.getDate() + i);
-      days.push({ date: d, dateStr: d.toISOString().split('T')[0] });
+      days.push({ date: d, dateStr: formatDateString(d) });
     }
 
     fetchScheduleCounts(days[0].date, days[6].date);
@@ -121,7 +128,7 @@ export default function CalendarPage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 dark:from-gray-900 dark:to-gray-800 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 dark:from-gray-900 dark:to-gray-800 pb-28">
       <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 shadow-lg shadow-gray-200/30 dark:shadow-gray-900/30">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
