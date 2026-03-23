@@ -11,6 +11,13 @@ interface ScheduleCount {
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 const FULL_WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
+const formatDateString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function CalendarPage() {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -27,6 +34,10 @@ export default function CalendarPage() {
     navigate('/todos');
   }, [navigate]);
 
+  const navigateToSchedulePage = useCallback(() => {
+    navigate('/schedule');
+  }, [navigate]);
+
   useEffect(() => {
     if (!user) {
       navigate('/auth');
@@ -36,8 +47,8 @@ export default function CalendarPage() {
   const fetchScheduleCounts = useCallback(async (startDate: Date, endDate: Date) => {
     if (!user) return;
 
-    const startStr = startDate.toISOString().split('T')[0];
-    const endStr = endDate.toISOString().split('T')[0];
+    const startStr = formatDateString(startDate);
+    const endStr = formatDateString(endDate);
 
     const { data, error } = await supabase
       .from('schedule')
@@ -80,20 +91,17 @@ export default function CalendarPage() {
       days.push({ date: d, isCurrentMonth: false, dateStr: formatDateString(d) });
     }
 
+    return days;
+  }, [currentMonth]);
+
+  useEffect(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
     fetchScheduleCounts(
       new Date(year, month - 1, 15),
       new Date(year, month + 2, 15)
     );
-
-    return days;
   }, [currentMonth, fetchScheduleCounts]);
-
-  const formatDateString = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
 
   const weekData = useMemo(() => {
     const today = new Date();
@@ -107,10 +115,14 @@ export default function CalendarPage() {
       days.push({ date: d, dateStr: formatDateString(d) });
     }
 
-    fetchScheduleCounts(days[0].date, days[6].date);
-
     return days;
-  }, [fetchScheduleCounts]);
+  }, []);
+
+  useEffect(() => {
+    if (weekData.length > 0) {
+      fetchScheduleCounts(weekData[0].date, weekData[6].date);
+    }
+  }, [weekData, fetchScheduleCounts]);
 
   const changeMonth = (delta: number) => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + delta, 1));
@@ -291,7 +303,7 @@ export default function CalendarPage() {
       <nav className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border-t border-gray-200/50 dark:border-gray-700/50 shadow-2xl shadow-gray-200/50 dark:shadow-gray-900/50">
         <div className="max-w-4xl mx-auto flex">
           <button
-            onClick={() => navigate('/schedule')}
+            onClick={navigateToSchedulePage}
             className="flex-1 py-4 text-center text-gray-500 dark:text-gray-400 font-bold hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
           >
             📅 日程规划
