@@ -54,7 +54,6 @@ export default function TodosPage() {
     if (!user) return;
     setLoading(true);
 
-    const priorityOrder = { high: 0, medium: 1, low: 2 };
     const { data, error } = await supabase
       .from('todo')
       .select('*')
