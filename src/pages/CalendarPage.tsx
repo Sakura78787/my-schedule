@@ -319,12 +319,12 @@ export default function CalendarPage() {
           </button>
           <button
             onClick={navigateToTodos}
-            className={`flex flex-col items-center gap-0.5 px-6 py-1 rounded-xl transition-all ${
+            className={`flex flex-col items-center gap-1 px-6 py-1 rounded-2xl transition-all ${
               theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            <span className="text-lg">✅</span>
-            <span className="font-medium text-xs">待办灵感</span>
+            <span className="text-xl">💭</span>
+            <span className="font-medium text-sm">思绪</span>
           </button>
         </div>
       </div>

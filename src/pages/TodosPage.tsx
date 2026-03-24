@@ -32,6 +32,7 @@ export default function TodosPage() {
   const [newPriority, setNewPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [editPriority, setEditPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [showConfirm, setShowConfirm] = useState<string | null>(null);
   const [showRemark, setShowRemark] = useState<string | null>(null);
 
@@ -53,11 +54,12 @@ export default function TodosPage() {
     if (!user) return;
     setLoading(true);
 
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
     const { data, error } = await supabase
       .from('todo')
       .select('*')
       .eq('user_id', user.id)
-      .order('priority', { ascending: false })
+      .order('priority', { ascending: true })
       .order('created_at', { ascending: false });
 
     if (!error && data) {
@@ -112,22 +114,21 @@ export default function TodosPage() {
   };
 
   const handleUpdateTodo = async (id: string) => {
-    const originalContent = todos.find(t => t.id === id)?.content;
+    const originalItem = todos.find(t => t.id === id);
 
     setTodos(prev => prev.map(item =>
-      item.id === id ? { ...item, content: editContent } : item
+      item.id === id ? { ...item, content: editContent, priority: editPriority } : item
     ));
     setEditingId(null);
-    setEditContent('');
 
     const { error } = await supabase
       .from('todo')
-      .update({ content: editContent, updated_at: new Date().toISOString() })
+      .update({ content: editContent, priority: editPriority, updated_at: new Date().toISOString() })
       .eq('id', id);
 
-    if (error && originalContent) {
+    if (error && originalItem) {
       setTodos(prev => prev.map(item =>
-        item.id === id ? { ...item, content: originalContent } : item
+        item.id === id ? { ...item, content: originalItem.content, priority: originalItem.priority } : item
       ));
     }
   };
@@ -281,29 +282,54 @@ export default function TodosPage() {
                         </span>
                       </div>
                       {editingId === todo.id ? (
-                        <div className="flex gap-2">
+                        <div className="space-y-3">
                           <input
                             type="text"
                             value={editContent}
                             onChange={(e) => setEditContent(e.target.value)}
-                            onBlur={() => handleUpdateTodo(todo.id)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') handleUpdateTodo(todo.id);
                               if (e.key === 'Escape') setEditingId(null);
                             }}
                             autoFocus
-                            className={`flex-1 px-3 py-2 rounded-xl ${
+                            className={`w-full px-3 py-2 rounded-xl ${
                               theme === 'dark' ? 'bg-slate-700 text-white' : 'bg-slate-50'
                             }`}
                           />
-                          <button
-                            onClick={() => setEditingId(null)}
-                            className={`px-3 py-2 rounded-xl font-medium ${
-                              theme === 'dark' ? 'bg-slate-700' : 'bg-slate-100'
-                            }`}
-                          >
-                            取消
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>优先级：</span>
+                            <div className="flex gap-1">
+                              {(['high', 'medium', 'low'] as const).map(p => (
+                                <button
+                                  key={p}
+                                  onClick={() => setEditPriority(p)}
+                                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                                    editPriority === p
+                                      ? getPriorityColor(p)
+                                      : theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'
+                                  }`}
+                                >
+                                  {getPriorityLabel(p)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleUpdateTodo(todo.id)}
+                              className="flex-1 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold text-sm"
+                            >
+                              保存
+                            </button>
+                            <button
+                              onClick={() => setEditingId(null)}
+                              className={`flex-1 py-2 rounded-xl font-medium text-sm ${
+                                theme === 'dark' ? 'bg-slate-700' : 'bg-slate-100'
+                              }`}
+                            >
+                              取消
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <>
@@ -330,7 +356,7 @@ export default function TodosPage() {
                     <div className="flex gap-1 flex-shrink-0">
                       {!todo.is_completed && editingId !== todo.id && (
                         <button
-                          onClick={() => { setEditingId(todo.id); setEditContent(todo.content); }}
+                          onClick={() => { setEditingId(todo.id); setEditContent(todo.content); setEditPriority(todo.priority); }}
                           className="p-2 text-slate-400 hover:text-blue-500"
                         >
                           ✏️
@@ -462,18 +488,18 @@ export default function TodosPage() {
           </button>
           <button
             onClick={navigateToCalendar}
-            className={`flex flex-col items-center gap-0.5 px-6 py-1 rounded-xl transition-all ${
+            className={`flex flex-col items-center gap-1 px-6 py-1 rounded-2xl transition-all ${
               theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            <span className="text-lg">📆</span>
-            <span className="font-medium text-xs">宏观</span>
+            <span className="text-xl">📆</span>
+            <span className="font-medium text-sm">宏观</span>
           </button>
           <button
-            className="flex flex-col items-center gap-0.5 px-6 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+            className="flex flex-col items-center gap-1 px-6 py-1 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white"
           >
-            <span className="text-lg">✅</span>
-            <span className="font-bold text-xs">待办灵感</span>
+            <span className="text-xl">💭</span>
+            <span className="font-bold text-sm">思绪</span>
           </button>
         </div>
       </div>

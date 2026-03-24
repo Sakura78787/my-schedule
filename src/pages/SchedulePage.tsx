@@ -526,8 +526,8 @@ export default function SchedulePage() {
               theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            <span className="text-xl">✅</span>
-            <span className="font-medium text-sm">待办灵感</span>
+            <span className="text-xl">💭</span>
+            <span className="font-medium text-sm">思绪</span>
           </button>
         </div>
       </div>
