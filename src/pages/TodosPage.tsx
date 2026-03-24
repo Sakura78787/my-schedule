@@ -58,14 +58,18 @@ export default function TodosPage() {
       .from('todo')
       .select('*')
       .eq('user_id', user.id)
-      .order('priority', { ascending: true })
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      const processed = data.map((item: any) => ({
-        ...item,
-        type: item.type || 'task'
-      }));
+      const priorityMap = { high: 0, medium: 1, low: 2 };
+      const processed = data
+        .map((item: any) => ({ ...item, type: item.type || 'task' }))
+        .sort((a: TodoItem, b: TodoItem) => {
+          if (priorityMap[a.priority] !== priorityMap[b.priority]) {
+            return priorityMap[a.priority] - priorityMap[b.priority];
+          }
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
       setTodos(processed);
     }
     setLoading(false);
