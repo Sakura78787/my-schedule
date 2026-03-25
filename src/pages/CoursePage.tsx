@@ -25,6 +25,8 @@ interface Course {
   time_slot: string;
   start_week: number;
   end_week: number;
+  week_type: 'all' | 'odd' | 'even';
+  remark: string | null;
   created_at: string;
 }
 
@@ -36,11 +38,27 @@ const TIME_SLOTS = [
   '20:00-22:00', '22:00-24:00',
 ];
 
+const WEEK_TYPE_LABELS: Record<string, string> = {
+  all: '每周',
+  odd: '单周',
+  even: '双周',
+};
+
 function formatDateString(date: Date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+function countWeeks(start: number, end: number, weekType: 'all' | 'odd' | 'even') {
+  let count = 0;
+  for (let w = start; w <= end; w++) {
+    if (weekType === 'odd' && w % 2 === 0) continue;
+    if (weekType === 'even' && w % 2 !== 0) continue;
+    count++;
+  }
+  return count;
 }
 
 export default function CoursePage() {
@@ -67,6 +85,8 @@ export default function CoursePage() {
   const [timeSlot, setTimeSlot] = useState(TIME_SLOTS[0]);
   const [startWeek, setStartWeek] = useState(1);
   const [endWeek, setEndWeek] = useState(18);
+  const [weekType, setWeekType] = useState<'all' | 'odd' | 'even'>('all');
+  const [remark, setRemark] = useState('');
 
   // 编辑课程
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
@@ -75,6 +95,8 @@ export default function CoursePage() {
   const [editTimeSlot, setEditTimeSlot] = useState(TIME_SLOTS[0]);
   const [editStartWeek, setEditStartWeek] = useState(1);
   const [editEndWeek, setEditEndWeek] = useState(18);
+  const [editWeekType, setEditWeekType] = useState<'all' | 'odd' | 'even'>('all');
+  const [editRemark, setEditRemark] = useState('');
 
   useEffect(() => {
     if (!user) navigate('/auth');
@@ -147,9 +169,13 @@ export default function CoursePage() {
       time_slot: timeSlot,
       start_week: startWeek,
       end_week: endWeek,
+      week_type: weekType,
+      remark: remark.trim() || null,
     });
     if (!error) {
       setCourseName('');
+      setRemark('');
+      setWeekType('all');
       setShowAddForm(false);
       fetchCourses();
     }
@@ -157,7 +183,15 @@ export default function CoursePage() {
 
   const handleUpdateCourse = async (id: string) => {
     const { error } = await supabase.from('course')
-      .update({ name: editCourseName.trim(), day_of_week: editDayOfWeek, time_slot: editTimeSlot, start_week: editStartWeek, end_week: editEndWeek })
+      .update({
+        name: editCourseName.trim(),
+        day_of_week: editDayOfWeek,
+        time_slot: editTimeSlot,
+        start_week: editStartWeek,
+        end_week: editEndWeek,
+        week_type: editWeekType,
+        remark: editRemark.trim() || null,
+      })
       .eq('id', id);
     if (!error) {
       setEditingCourseId(null);
@@ -170,15 +204,15 @@ export default function CoursePage() {
     fetchCourses();
   };
 
-  // 计算将要生成的日程总数
-  const totalSchedules = courses.reduce((sum, c) => sum + (c.end_week - c.start_week + 1), 0);
+  // 计算将要生成的日程总数（考虑单双周）
+  const totalSchedules = courses.reduce((sum, c) =>
+    sum + countWeeks(c.start_week, c.end_week, c.week_type), 0);
 
   // 一键生成日程
   const handleImport = async () => {
     if (!user || !template || courses.length === 0) return;
     setImporting(true);
 
-    // 如果已导入过，先删除旧的
     if (template.is_imported) {
       await supabase.from('schedule').delete().eq('source_template_id', template.id);
     }
@@ -188,25 +222,32 @@ export default function CoursePage() {
 
     for (const course of courses) {
       for (let week = course.start_week; week <= course.end_week; week++) {
+        if (course.week_type === 'odd' && week % 2 === 0) continue;
+        if (course.week_type === 'even' && week % 2 !== 0) continue;
+
         const date = new Date(semStart);
         date.setDate(date.getDate() + (week - 1) * 7 + (course.day_of_week - 1));
+
+        // 备注追加到课程名后面
+        const content = course.remark
+          ? `${course.name}（${course.remark}）`
+          : course.name;
+
         items.push({
           user_id: user.id,
           date: formatDateString(date),
           time_slot: course.time_slot,
-          content: course.name,
+          content,
           is_completed: false,
           source_template_id: template.id,
         });
       }
     }
 
-    // 分批插入（每批500条）
     for (let i = 0; i < items.length; i += 500) {
       await supabase.from('schedule').insert(items.slice(i, i + 500));
     }
 
-    // 更新模板状态
     await supabase.from('course_template')
       .update({ is_imported: true, updated_at: new Date().toISOString() })
       .eq('id', template.id);
@@ -215,7 +256,6 @@ export default function CoursePage() {
     setImporting(false);
   };
 
-  // 按星期分组
   const coursesByDay = courses.reduce((acc, c) => {
     if (!acc[c.day_of_week]) acc[c.day_of_week] = [];
     acc[c.day_of_week].push(c);
@@ -227,6 +267,27 @@ export default function CoursePage() {
   const cardClass = `rounded-2xl p-5 shadow-lg ${theme === 'dark' ? 'bg-slate-800' : 'bg-white'}`;
   const inputClass = `w-full px-3 py-2 rounded-xl ${theme === 'dark' ? 'bg-slate-700 text-white' : 'bg-slate-50 text-slate-900'}`;
   const labelClass = `block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`;
+
+  const WeekTypeSelector = ({
+    value, onChange
+  }: { value: 'all' | 'odd' | 'even'; onChange: (v: 'all' | 'odd' | 'even') => void }) => (
+    <div className="flex gap-1">
+      {(['all', 'odd', 'even'] as const).map(t => (
+        <button
+          key={t}
+          type="button"
+          onClick={() => onChange(t)}
+          className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
+            value === t
+              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
+              : theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
+          }`}
+        >
+          {WEEK_TYPE_LABELS[t]}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div className={`min-h-screen pb-48 ${theme === 'dark' ? 'bg-slate-900' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'}`}>
@@ -323,6 +384,14 @@ export default function CoursePage() {
                     <input type="number" value={endWeek} onChange={e => setEndWeek(Math.min(totalWeeks, Number(e.target.value)))} min={1} max={totalWeeks} className={inputClass} />
                   </div>
                 </div>
+                <div>
+                  <label className={labelClass}>周次类型</label>
+                  <WeekTypeSelector value={weekType} onChange={setWeekType} />
+                </div>
+                <div>
+                  <label className={labelClass}>备注（可选，如教室）</label>
+                  <input type="text" value={remark} onChange={e => setRemark(e.target.value)} placeholder="如：教学楼 A301" className={inputClass} />
+                </div>
                 <button onClick={handleAddCourse} disabled={!courseName.trim()} className="w-full py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold text-sm disabled:opacity-50">
                   添加课程
                 </button>
@@ -348,7 +417,7 @@ export default function CoursePage() {
                         <div key={course.id} className={cardClass}>
                           {editingCourseId === course.id ? (
                             <div className="space-y-3">
-                              <input type="text" value={editCourseName} onChange={e => setEditCourseName(e.target.value)} className={inputClass} />
+                              <input type="text" value={editCourseName} onChange={e => setEditCourseName(e.target.value)} placeholder="课程名" className={inputClass} />
                               <div className="grid grid-cols-2 gap-2">
                                 <select value={editDayOfWeek} onChange={e => setEditDayOfWeek(Number(e.target.value))} className={inputClass}>
                                   {[1,2,3,4,5,6,7].map(d => <option key={d} value={d}>{DAY_LABELS[d]}</option>)}
@@ -361,6 +430,11 @@ export default function CoursePage() {
                                 <input type="number" value={editStartWeek} onChange={e => setEditStartWeek(Number(e.target.value))} min={1} max={totalWeeks} className={inputClass} placeholder="起始周" />
                                 <input type="number" value={editEndWeek} onChange={e => setEditEndWeek(Number(e.target.value))} min={1} max={totalWeeks} className={inputClass} placeholder="结束周" />
                               </div>
+                              <div>
+                                <label className={labelClass}>周次类型</label>
+                                <WeekTypeSelector value={editWeekType} onChange={setEditWeekType} />
+                              </div>
+                              <input type="text" value={editRemark} onChange={e => setEditRemark(e.target.value)} placeholder="备注（教室等）" className={inputClass} />
                               <div className="flex gap-2">
                                 <button onClick={() => handleUpdateCourse(course.id)} className="flex-1 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold text-sm">保存</button>
                                 <button onClick={() => setEditingCourseId(null)} className="flex-1 py-2 rounded-xl text-sm bg-slate-100 dark:bg-slate-700">取消</button>
@@ -368,14 +442,39 @@ export default function CoursePage() {
                             </div>
                           ) : (
                             <div className="flex items-center justify-between">
-                              <div>
-                                <p className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>{course.name}</p>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-0.5">
+                                  <p className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>{course.name}</p>
+                                  <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
+                                    course.week_type === 'all'
+                                      ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                                      : course.week_type === 'odd'
+                                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                                      : 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'
+                                  }`}>
+                                    {WEEK_TYPE_LABELS[course.week_type]}
+                                  </span>
+                                </div>
                                 <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                                   {course.time_slot} · 第{course.start_week}-{course.end_week}周
                                 </p>
+                                {course.remark && (
+                                  <p className={`text-xs mt-0.5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                    📍 {course.remark}
+                                  </p>
+                                )}
                               </div>
-                              <div className="flex gap-1">
-                                <button onClick={() => { setEditingCourseId(course.id); setEditCourseName(course.name); setEditDayOfWeek(course.day_of_week); setEditTimeSlot(course.time_slot); setEditStartWeek(course.start_week); setEditEndWeek(course.end_week); }} className="p-2 text-slate-400 hover:text-blue-500">✏️</button>
+                              <div className="flex gap-1 ml-2 flex-shrink-0">
+                                <button onClick={() => {
+                                  setEditingCourseId(course.id);
+                                  setEditCourseName(course.name);
+                                  setEditDayOfWeek(course.day_of_week);
+                                  setEditTimeSlot(course.time_slot);
+                                  setEditStartWeek(course.start_week);
+                                  setEditEndWeek(course.end_week);
+                                  setEditWeekType(course.week_type);
+                                  setEditRemark(course.remark || '');
+                                }} className="p-2 text-slate-400 hover:text-blue-500">✏️</button>
                                 <button onClick={() => handleDeleteCourse(course.id)} className="p-2 text-slate-400 hover:text-red-500">🗑️</button>
                               </div>
                             </div>

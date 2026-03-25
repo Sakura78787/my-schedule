@@ -237,12 +237,14 @@ export default function CalendarPage() {
                     }`}
                     title={holiday ? holiday.name + (isWorkday ? '（调休上班）' : '') : undefined}
                   >
-                    {/* 休/班 标记 */}
-                    {isHoliday && !today && (
-                      <span className="absolute top-0.5 left-1 text-[10px] font-bold text-red-500 dark:text-red-400">休</span>
+                    {/* 节日名/班 标记 */}
+                    {isHoliday && !today && isCurrentMonth && (
+                      <span className="absolute top-0 left-0 right-0 text-center text-[9px] font-bold text-red-500 dark:text-red-400 leading-tight">
+                        {holiday.name.slice(0, 2)}
+                      </span>
                     )}
-                    {isWorkday && !today && (
-                      <span className="absolute top-0.5 left-1 text-[10px] font-bold text-gray-400 dark:text-gray-500">班</span>
+                    {isWorkday && !today && isCurrentMonth && (
+                      <span className="absolute top-0.5 left-1 text-[9px] font-bold text-gray-400 dark:text-gray-500">班</span>
                     )}
                     <span className={`text-sm font-bold ${
                       today ? 'text-white'
