@@ -175,7 +175,7 @@ export default function AuthPage() {
               type="email"
               value={email}
               onChange={setEmail}
-              placeholder="your@qq.com"
+              placeholder=""
               hint={view !== 'login' ? '仅支持 QQ邮箱 和 163邮箱' : undefined}
             />
           )}
@@ -187,7 +187,7 @@ export default function AuthPage() {
               type="password"
               value={password}
               onChange={setPassword}
-              placeholder="••••••••"
+              placeholder=""
               hint={view !== 'login' ? '至少 6 位字符' : undefined}
             />
           )}
@@ -199,7 +199,7 @@ export default function AuthPage() {
               type="password"
               value={confirmPassword}
               onChange={setConfirmPassword}
-              placeholder="••••••••"
+              placeholder=""
             />
           )}
 
