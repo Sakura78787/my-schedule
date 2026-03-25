@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import BottomNav from '../components/BottomNav';
 
 interface ScheduleItem {
   id: string;
@@ -73,14 +74,6 @@ export default function SchedulePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [showConfirm, setShowConfirm] = useState<string | null>(null);
-
-  const navigateToTodos = useCallback(() => {
-    navigate('/todos');
-  }, [navigate]);
-
-  const navigateToCalendar = useCallback(() => {
-    navigate('/calendar');
-  }, [navigate]);
 
   useEffect(() => {
     if (!user) {
@@ -503,34 +496,7 @@ export default function SchedulePage() {
         </div>
       )}
 
-      <div className={`fixed bottom-0 left-0 right-0 ${theme === 'dark' ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-lg border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'} px-4 py-2 pb-6`}>
-        <div className="flex justify-around max-w-md mx-auto">
-          <button
-            className="flex flex-col items-center gap-1 px-6 py-1 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-          >
-            <span className="text-xl">📖</span>
-            <span className="font-bold text-sm">微观</span>
-          </button>
-          <button
-            onClick={navigateToCalendar}
-            className={`flex flex-col items-center gap-1 px-6 py-1 rounded-2xl transition-all ${
-              theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <span className="text-xl">📆</span>
-            <span className="font-medium text-sm">宏观</span>
-          </button>
-          <button
-            onClick={navigateToTodos}
-            className={`flex flex-col items-center gap-1 px-6 py-1 rounded-2xl transition-all ${
-              theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <span className="text-xl">💭</span>
-            <span className="font-medium text-sm">思绪</span>
-          </button>
-        </div>
-      </div>
+      <BottomNav active="schedule" />
     </div>
   );
 }

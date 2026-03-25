@@ -3,6 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import BottomNav from '../components/BottomNav';
+import { getHoliday } from '../data/holidays';
 
 interface ScheduleCount {
   [date: string]: number;
@@ -28,14 +30,6 @@ export default function CalendarPage() {
 
   const navigateToSchedule = useCallback((date: string) => {
     navigate(`/schedule?date=${date}`);
-  }, [navigate]);
-
-  const navigateToTodos = useCallback(() => {
-    navigate('/todos');
-  }, [navigate]);
-
-  const navigateToSchedulePage = useCallback(() => {
-    navigate('/schedule');
   }, [navigate]);
 
   useEffect(() => {
@@ -224,24 +218,41 @@ export default function CalendarPage() {
               {calendarData.map(({ date, isCurrentMonth, dateStr }) => {
                 const count = scheduleCounts[dateStr] || 0;
                 const today = isToday(date);
+                const holiday = getHoliday(dateStr);
+                const isHoliday = holiday && !holiday.isWorkday;
+                const isWorkday = holiday && holiday.isWorkday;
 
                 return (
                   <button
                     key={dateStr}
                     onClick={() => navigateToSchedule(dateStr)}
-                    className={`aspect-square rounded-2xl p-2 flex flex-col items-center justify-center transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-1 ${
+                    className={`relative aspect-square rounded-2xl p-1.5 flex flex-col items-center justify-center transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-1 ${
                       !isCurrentMonth
                         ? 'bg-gray-50 dark:bg-gray-700/50 opacity-40'
                         : today
                         ? 'bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30'
+                        : isHoliday
+                        ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30'
                         : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 hover:from-amber-50 hover:to-orange-50 dark:hover:from-amber-900/30 dark:hover:to-orange-900/30'
                     }`}
+                    title={holiday ? holiday.name + (isWorkday ? '（调休上班）' : '') : undefined}
                   >
-                    <span className={`text-sm font-bold ${today ? 'text-white' : 'text-gray-800 dark:text-gray-200'}`}>
+                    {/* 休/班 标记 */}
+                    {isHoliday && !today && (
+                      <span className="absolute top-0.5 left-1 text-[10px] font-bold text-red-500 dark:text-red-400">休</span>
+                    )}
+                    {isWorkday && !today && (
+                      <span className="absolute top-0.5 left-1 text-[10px] font-bold text-gray-400 dark:text-gray-500">班</span>
+                    )}
+                    <span className={`text-sm font-bold ${
+                      today ? 'text-white'
+                        : isHoliday ? 'text-red-600 dark:text-red-400'
+                        : 'text-gray-800 dark:text-gray-200'
+                    }`}>
                       {date.getDate()}
                     </span>
                     {count > 0 && (
-                      <div className={`mt-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+                      <div className={`mt-0.5 px-1.5 py-0 rounded-full text-[10px] font-bold ${
                         today
                           ? 'bg-white/30 text-white'
                           : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
@@ -261,6 +272,7 @@ export default function CalendarPage() {
             {weekData.map(({ date, dateStr }) => {
               const count = scheduleCounts[dateStr] || 0;
               const today = isToday(date);
+              const holiday = getHoliday(dateStr);
 
               return (
                 <button
@@ -282,6 +294,11 @@ export default function CalendarPage() {
                       <div className="text-sm text-gray-500 dark:text-gray-400">
                         {date.getMonth() + 1}月{date.getDate()}日
                         {today && <span className="ml-2 text-amber-500">✨ 今天</span>}
+                        {holiday && (
+                          <span className={`ml-2 ${holiday.isWorkday ? 'text-gray-400' : 'text-red-500'}`}>
+                            {holiday.isWorkday ? `📋 ${holiday.name}调休` : `🎉 ${holiday.name}`}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -300,34 +317,7 @@ export default function CalendarPage() {
         )}
       </main>
 
-      <div className={`fixed bottom-0 left-0 right-0 ${theme === 'dark' ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-lg border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'} px-4 py-2 pb-5`}>
-        <div className="flex justify-around max-w-md mx-auto">
-          <button
-            onClick={navigateToSchedulePage}
-            className={`flex flex-col items-center gap-0.5 px-6 py-1 rounded-xl transition-all ${
-              theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <span className="text-lg">📖</span>
-            <span className="font-medium text-xs">微观</span>
-          </button>
-          <button
-            className="flex flex-col items-center gap-0.5 px-6 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-          >
-            <span className="text-lg">📆</span>
-            <span className="font-bold text-xs">宏观</span>
-          </button>
-          <button
-            onClick={navigateToTodos}
-            className={`flex flex-col items-center gap-1 px-6 py-1 rounded-2xl transition-all ${
-              theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <span className="text-xl">💭</span>
-            <span className="font-medium text-sm">思绪</span>
-          </button>
-        </div>
-      </div>
+      <BottomNav active="calendar" />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import AuthPage from './pages/AuthPage';
 import SchedulePage from './pages/SchedulePage';
 import TodosPage from './pages/TodosPage';
 import CalendarPage from './pages/CalendarPage';
+import CoursePage from './pages/CoursePage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -62,6 +63,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <CalendarPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/course"
+        element={
+          <ProtectedRoute>
+            <CoursePage />
           </ProtectedRoute>
         }
       />

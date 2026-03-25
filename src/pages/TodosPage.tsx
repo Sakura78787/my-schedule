@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import BottomNav from '../components/BottomNav';
 
 interface TodoItem {
   id: string;
@@ -35,14 +36,6 @@ export default function TodosPage() {
   const [editPriority, setEditPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [showConfirm, setShowConfirm] = useState<string | null>(null);
   const [showRemark, setShowRemark] = useState<string | null>(null);
-
-  const navigateToSchedule = useCallback(() => {
-    navigate('/schedule');
-  }, [navigate]);
-
-  const navigateToCalendar = useCallback(() => {
-    navigate('/calendar');
-  }, [navigate]);
 
   useEffect(() => {
     if (!user) {
@@ -478,34 +471,7 @@ export default function TodosPage() {
         </div>
       )}
 
-      <div className={`fixed bottom-0 left-0 right-0 z-20 ${theme === 'dark' ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-lg border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'} px-4 py-2 pb-5`}>
-        <div className="flex justify-around max-w-md mx-auto">
-          <button
-            onClick={navigateToSchedule}
-            className={`flex flex-col items-center gap-0.5 px-6 py-1 rounded-xl transition-all ${
-              theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <span className="text-lg">📖</span>
-            <span className="font-medium text-xs">微观</span>
-          </button>
-          <button
-            onClick={navigateToCalendar}
-            className={`flex flex-col items-center gap-1 px-6 py-1 rounded-2xl transition-all ${
-              theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <span className="text-xl">📆</span>
-            <span className="font-medium text-sm">宏观</span>
-          </button>
-          <button
-            className="flex flex-col items-center gap-1 px-6 py-1 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-          >
-            <span className="text-xl">💭</span>
-            <span className="font-bold text-sm">思绪</span>
-          </button>
-        </div>
-      </div>
+      <BottomNav active="todos" />
     </div>
   );
 }
