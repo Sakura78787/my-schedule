@@ -25,7 +25,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { user, loading } = useAuth();
+  const { user, loading, isRecoveryMode } = useAuth();
 
   if (loading) {
     return (
@@ -39,7 +39,7 @@ function AppRoutes() {
     <Routes>
       <Route
         path="/auth"
-        element={user ? <Navigate to="/schedule" replace /> : <AuthPage />}
+        element={user && !isRecoveryMode ? <Navigate to="/schedule" replace /> : <AuthPage />}
       />
       <Route
         path="/schedule"
