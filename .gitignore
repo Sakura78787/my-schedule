@@ -35,3 +35,10 @@ lerna-debug.log*
 # AI/Editor tool configs
 .claude/
 .continue/
+
+# SSH keys
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+id_ecdsa*
