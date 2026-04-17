@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { GuestExperienceProvider, useGuestExperience } from './contexts/GuestExperienceContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import AuthPage from './pages/AuthPage';
 import SchedulePage from './pages/SchedulePage';
@@ -7,8 +9,18 @@ import TodosPage from './pages/TodosPage';
 import CalendarPage from './pages/CalendarPage';
 import CoursePage from './pages/CoursePage';
 
+function ClearGuestWhenLoggedIn() {
+  const { user } = useAuth();
+  const { clearGuestBecauseUserLoggedIn } = useGuestExperience();
+  useEffect(() => {
+    if (user) clearGuestBecauseUserLoggedIn();
+  }, [user, clearGuestBecauseUserLoggedIn]);
+  return null;
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const { isGuest } = useGuestExperience();
 
   if (loading) {
     return (
@@ -18,7 +30,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) {
+  if (!user && !isGuest) {
     return <Navigate to="/auth" replace />;
   }
 
@@ -27,6 +39,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   const { user, loading, isRecoveryMode } = useAuth();
+  const { isGuest } = useGuestExperience();
 
   if (loading) {
     return (
@@ -74,7 +87,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route path="/" element={<Navigate to={user ? "/schedule" : "/auth"} replace />} />
+      <Route path="/" element={<Navigate to={user || isGuest ? "/schedule" : "/auth"} replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -85,7 +98,10 @@ function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <AppRoutes />
+          <GuestExperienceProvider>
+            <ClearGuestWhenLoggedIn />
+            <AppRoutes />
+          </GuestExperienceProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useGuestExperience } from '../contexts/GuestExperienceContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
+import GuestBanner from '../components/GuestBanner';
 
 interface ScheduleItem {
   id: string;
@@ -63,6 +65,14 @@ const getTodayLocal = () => {
 
 export default function SchedulePage() {
   const { user, signOut } = useAuth();
+  const {
+    isGuest,
+    exitGuestMode,
+    getGroupedSchedulesForDate,
+    addGuestSchedule,
+    updateGuestSchedule,
+    deleteGuestSchedule,
+  } = useGuestExperience();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -76,10 +86,10 @@ export default function SchedulePage() {
   const [showConfirm, setShowConfirm] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {
+    if (!user && !isGuest) {
       navigate('/auth');
     }
-  }, [user, navigate]);
+  }, [user, isGuest, navigate]);
 
   useEffect(() => {
     if (dateParam) {
@@ -103,6 +113,12 @@ export default function SchedulePage() {
   }, [currentDate, dateParam]);
 
   const fetchSchedules = useCallback(async () => {
+    if (isGuest) {
+      setSchedules(
+        getGroupedSchedulesForDate(currentDate, ALL_SLOTS) as Record<string, ScheduleItem[]>
+      );
+      return;
+    }
     if (!user) return;
     setLoading(true);
     const { data, error } = await supabase
@@ -123,7 +139,7 @@ export default function SchedulePage() {
       setSchedules(grouped);
     }
     setLoading(false);
-  }, [user, currentDate]);
+  }, [user, currentDate, isGuest, getGroupedSchedulesForDate]);
 
   useEffect(() => {
     fetchSchedules();
@@ -171,8 +187,14 @@ export default function SchedulePage() {
   };
 
   const handleAddSchedule = async (timeSlot: string) => {
-    if (!user || !newContent[timeSlot]?.trim()) return;
+    if (!newContent[timeSlot]?.trim()) return;
     const content = newContent[timeSlot].trim();
+    if (isGuest) {
+      addGuestSchedule({ date: currentDate, time_slot: timeSlot, content });
+      setNewContent(prev => ({ ...prev, [timeSlot]: '' }));
+      return;
+    }
+    if (!user) return;
     const tempId = Date.now().toString();
     const newItem: ScheduleItem = {
       id: tempId,
@@ -204,6 +226,10 @@ export default function SchedulePage() {
   };
 
   const handleToggleComplete = async (id: string, timeSlot: string, currentState: boolean) => {
+    if (isGuest) {
+      updateGuestSchedule(id, { is_completed: !currentState });
+      return;
+    }
     setSchedules(prev => ({
       ...prev,
       [timeSlot]: prev[timeSlot].map(item =>
@@ -228,6 +254,11 @@ export default function SchedulePage() {
         break;
       }
     }
+    if (isGuest) {
+      updateGuestSchedule(id, { content: editContent });
+      setEditingId(null);
+      return;
+    }
     setSchedules(prev => ({
       ...prev,
       [timeSlot]: prev[timeSlot].map(item =>
@@ -246,6 +277,11 @@ export default function SchedulePage() {
   };
 
   const handleDeleteSchedule = async (id: string, timeSlot: string) => {
+    if (isGuest) {
+      deleteGuestSchedule(id);
+      setShowConfirm(null);
+      return;
+    }
     const originalItems = [...(schedules[timeSlot] || [])];
     setSchedules(prev => ({
       ...prev,
@@ -271,11 +307,12 @@ export default function SchedulePage() {
     return TIME_BLOCKS.find(block => block.slots.includes(slot));
   };
 
-  if (!user) return null;
+  if (!user && !isGuest) return null;
 
   return (
     <div className={`min-h-screen pb-56 ${theme === 'dark' ? 'bg-slate-900' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'}`}>
       <div className="p-4">
+        <GuestBanner />
         <div className="flex justify-between items-center mb-6">
           <button
             onClick={toggleTheme}
@@ -288,12 +325,12 @@ export default function SchedulePage() {
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
           <button
-            onClick={signOut}
+            onClick={isGuest ? exitGuestMode : signOut}
             className={`px-4 py-2 rounded-xl font-medium ${
               theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-800'
             }`}
           >
-            退出登录
+            {isGuest ? '结束体验' : '退出登录'}
           </button>
         </div>
 

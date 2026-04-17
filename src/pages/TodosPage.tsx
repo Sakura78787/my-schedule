@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useGuestExperience } from '../contexts/GuestExperienceContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
+import GuestBanner from '../components/GuestBanner';
 
 interface TodoItem {
   id: string;
@@ -22,6 +24,14 @@ type TabType = 'task' | 'idea';
 
 export default function TodosPage() {
   const { user } = useAuth();
+  const {
+    isGuest,
+    getSortedGuestTodos,
+    addGuestTodo,
+    updateGuestTodo,
+    deleteGuestTodo,
+    toggleGuestTodoComplete,
+  } = useGuestExperience();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [todos, setTodos] = useState<TodoItem[]>([]);
@@ -38,12 +48,17 @@ export default function TodosPage() {
   const [showRemark, setShowRemark] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {
+    if (!user && !isGuest) {
       navigate('/auth');
     }
-  }, [user, navigate]);
+  }, [user, isGuest, navigate]);
 
   const fetchTodos = useCallback(async () => {
+    if (isGuest) {
+      setTodos(getSortedGuestTodos() as TodoItem[]);
+      setLoading(false);
+      return;
+    }
     if (!user) return;
     setLoading(true);
 
@@ -56,7 +71,7 @@ export default function TodosPage() {
     if (!error && data) {
       const priorityMap = { high: 0, medium: 1, low: 2 };
       const processed = data
-        .map((item: any) => ({ ...item, type: item.type || 'task' }))
+        .map((item: TodoItem & { type?: string }) => ({ ...item, type: item.type || 'task' }))
         .sort((a: TodoItem, b: TodoItem) => {
           if (priorityMap[a.priority] !== priorityMap[b.priority]) {
             return priorityMap[a.priority] - priorityMap[b.priority];
@@ -66,14 +81,27 @@ export default function TodosPage() {
       setTodos(processed);
     }
     setLoading(false);
-  }, [user]);
+  }, [user, isGuest, getSortedGuestTodos]);
 
   useEffect(() => {
     fetchTodos();
   }, [fetchTodos]);
 
   const handleAddTodo = async () => {
-    if (!user || !newContent.trim()) return;
+    if (!newContent.trim()) return;
+    if (isGuest) {
+      addGuestTodo({
+        content: newContent.trim(),
+        remark: newRemark.trim() || null,
+        priority: newPriority,
+        type: tab,
+      });
+      setNewContent('');
+      setNewRemark('');
+      setNewPriority('medium');
+      return;
+    }
+    if (!user) return;
 
     const tempId = Date.now().toString();
     const newItem: TodoItem = {
@@ -110,6 +138,11 @@ export default function TodosPage() {
   };
 
   const handleUpdateTodo = async (id: string) => {
+    if (isGuest) {
+      updateGuestTodo(id, { content: editContent, priority: editPriority });
+      setEditingId(null);
+      return;
+    }
     const originalItem = todos.find(t => t.id === id);
 
     setTodos(prev => prev.map(item =>
@@ -130,6 +163,11 @@ export default function TodosPage() {
   };
 
   const handleDeleteTodo = async (id: string) => {
+    if (isGuest) {
+      deleteGuestTodo(id);
+      setShowConfirm(null);
+      return;
+    }
     const deletedItem = todos.find(t => t.id === id);
 
     setShowConfirm(null);
@@ -143,6 +181,10 @@ export default function TodosPage() {
   };
 
   const handleToggleComplete = async (item: TodoItem) => {
+    if (isGuest) {
+      toggleGuestTodoComplete(item.id);
+      return;
+    }
     setTodos(prev => prev.map(t =>
       t.id === item.id ? { ...t, is_completed: !t.is_completed } : t
     ));
@@ -183,11 +225,12 @@ export default function TodosPage() {
     return colors[priority] || '';
   };
 
-  if (!user) return null;
+  if (!user && !isGuest) return null;
 
   return (
     <div className={`min-h-screen pb-48 ${theme === 'dark' ? 'bg-slate-900' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'}`}>
       <div className="p-4">
+        <GuestBanner />
         <div className="flex justify-between items-center mb-6">
           <button
             onClick={toggleTheme}

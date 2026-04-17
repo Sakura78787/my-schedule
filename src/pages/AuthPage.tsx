@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useGuestExperience } from '../contexts/GuestExperienceContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import AuthLayout from '../components/auth/AuthLayout';
 import AuthInput from '../components/auth/AuthInput';
@@ -10,16 +11,23 @@ type AuthView = 'login' | 'register' | 'forgot-password' | 'reset-password';
 function validateEmail(email: string): string | null {
   const trimmed = email.trim().toLowerCase();
   if (!trimmed) return '请输入邮箱地址';
-  const emailRegex = /^[^\s@]+@(qq\.com|163\.com)$/i;
-  if (!emailRegex.test(trimmed)) {
-    return '仅支持 QQ邮箱(@qq.com) 和 163邮箱(@163.com)';
+  if (trimmed.endsWith('@qq.com')) {
+    const local = trimmed.slice(0, -'@qq.com'.length);
+    if (!/^\d{8,10}$/.test(local)) {
+      return 'QQ 邮箱：@qq.com 前须为 8～10 位数字';
+    }
+    return null;
   }
-  return null;
+  if (/^[^\s@]+@163\.com$/i.test(trimmed)) {
+    return null;
+  }
+  return '仅支持 QQ邮箱(@qq.com) 和 163邮箱(@163.com)';
 }
 
 export default function AuthPage() {
   const [searchParams] = useSearchParams();
   const { signIn, signUp, resetPassword, updatePassword, isRecoveryMode } = useAuth();
+  const { enterGuestMode } = useGuestExperience();
   const navigate = useNavigate();
 
   const [view, setView] = useState<AuthView>(() => {
@@ -167,6 +175,18 @@ export default function AuthPage() {
           </div>
         )}
 
+        {(view === 'login' || view === 'register') && (
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={enterGuestMode}
+              className="w-full py-3 px-4 rounded-xl text-sm font-medium border-2 border-dashed border-slate-300 dark:border-slate-500 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+            >
+              游客体验（数据不保存，仅本次会话有效）
+            </button>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* 邮箱输入 - 登录/注册/忘记密码 */}
           {view !== 'reset-password' && (
@@ -176,7 +196,7 @@ export default function AuthPage() {
               value={email}
               onChange={setEmail}
               placeholder=""
-              hint={view !== 'login' ? '仅支持 QQ邮箱 和 163邮箱' : undefined}
+              hint={view !== 'login' ? 'QQ 为 8～10 位数字；163 邮箱格式正确即可' : undefined}
             />
           )}
 

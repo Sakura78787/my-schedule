@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useGuestExperience } from '../contexts/GuestExperienceContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
+import GuestBanner from '../components/GuestBanner';
 import { getHoliday } from '../data/holidays';
 
 interface ScheduleCount {
@@ -22,6 +24,7 @@ const formatDateString = (date: Date) => {
 
 export default function CalendarPage() {
   const { user } = useAuth();
+  const { isGuest, getScheduleCountsBetween } = useGuestExperience();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -33,16 +36,20 @@ export default function CalendarPage() {
   }, [navigate]);
 
   useEffect(() => {
-    if (!user) {
+    if (!user && !isGuest) {
       navigate('/auth');
     }
-  }, [user, navigate]);
+  }, [user, isGuest, navigate]);
 
   const fetchScheduleCounts = useCallback(async (startDate: Date, endDate: Date) => {
-    if (!user) return;
-
     const startStr = formatDateString(startDate);
     const endStr = formatDateString(endDate);
+
+    if (isGuest) {
+      setScheduleCounts(getScheduleCountsBetween(startStr, endStr));
+      return;
+    }
+    if (!user) return;
 
     const { data, error } = await supabase
       .from('schedule')
@@ -58,7 +65,7 @@ export default function CalendarPage() {
       });
       setScheduleCounts(counts);
     }
-  }, [user]);
+  }, [user, isGuest, getScheduleCountsBetween]);
 
   const calendarData = useMemo(() => {
     const year = currentMonth.getFullYear();
@@ -131,12 +138,13 @@ export default function CalendarPage() {
     return `${currentMonth.getFullYear()}年${currentMonth.getMonth() + 1}月`;
   };
 
-  if (!user) return null;
+  if (!user && !isGuest) return null;
 
   return (
     <div className={`min-h-screen pb-16 ${theme === 'dark' ? 'bg-slate-900' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'}`}>
       <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 shadow-lg shadow-gray-200/30 dark:shadow-gray-900/30">
         <div className="max-w-4xl mx-auto px-4 py-4">
+          <GuestBanner />
           <div className="flex items-center justify-between mb-4">
             <button
               onClick={toggleTheme}

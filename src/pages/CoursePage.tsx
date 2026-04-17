@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useGuestExperience } from '../contexts/GuestExperienceContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
+import GuestBanner from '../components/GuestBanner';
 
 interface CourseTemplate {
   id: string;
@@ -63,6 +65,17 @@ function countWeeks(start: number, end: number, weekType: 'all' | 'odd' | 'even'
 
 export default function CoursePage() {
   const { user } = useAuth();
+  const {
+    isGuest,
+    courseTemplate: ctxTemplate,
+    courses: ctxCourses,
+    createGuestCourseTemplate,
+    updateGuestCourseTemplate,
+    addGuestCourse,
+    updateGuestCourse,
+    deleteGuestCourse,
+    importGuestCoursesToSchedules,
+  } = useGuestExperience();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
@@ -99,10 +112,28 @@ export default function CoursePage() {
   const [editRemark, setEditRemark] = useState('');
 
   useEffect(() => {
-    if (!user) navigate('/auth');
-  }, [user, navigate]);
+    if (!user && !isGuest) navigate('/auth');
+  }, [user, isGuest, navigate]);
+
+  useEffect(() => {
+    if (!isGuest) return;
+    if (ctxTemplate) {
+      setTemplate(ctxTemplate as CourseTemplate);
+      setSemesterName(ctxTemplate.name);
+      setSemesterStart(ctxTemplate.semester_start);
+      setTotalWeeks(ctxTemplate.total_weeks);
+    } else {
+      setTemplate(null);
+    }
+  }, [isGuest, ctxTemplate]);
+
+  useEffect(() => {
+    if (!isGuest) return;
+    setCourses(ctxCourses as Course[]);
+  }, [isGuest, ctxCourses]);
 
   const fetchTemplate = useCallback(async () => {
+    if (isGuest) return;
     if (!user) return;
     const { data } = await supabase
       .from('course_template')
@@ -116,9 +147,10 @@ export default function CoursePage() {
       setSemesterStart(data[0].semester_start);
       setTotalWeeks(data[0].total_weeks);
     }
-  }, [user]);
+  }, [user, isGuest]);
 
   const fetchCourses = useCallback(async () => {
+    if (isGuest) return;
     if (!user || !template) return;
     setLoading(true);
     const { data } = await supabase
@@ -129,13 +161,23 @@ export default function CoursePage() {
       .order('time_slot');
     if (data) setCourses(data);
     setLoading(false);
-  }, [user, template]);
+  }, [user, template, isGuest]);
 
   useEffect(() => { fetchTemplate(); }, [fetchTemplate]);
   useEffect(() => { fetchCourses(); }, [fetchCourses]);
 
   const handleCreateTemplate = async () => {
-    if (!user || !semesterName.trim() || !semesterStart) return;
+    if (!semesterName.trim() || !semesterStart) return;
+    if (isGuest) {
+      createGuestCourseTemplate({
+        name: semesterName.trim(),
+        semester_start: semesterStart,
+        total_weeks: totalWeeks,
+      });
+      setEditingTemplate(false);
+      return;
+    }
+    if (!user) return;
     const { data, error } = await supabase
       .from('course_template')
       .insert({ user_id: user.id, name: semesterName.trim(), semester_start: semesterStart, total_weeks: totalWeeks })
@@ -149,6 +191,15 @@ export default function CoursePage() {
 
   const handleUpdateTemplate = async () => {
     if (!template) return;
+    if (isGuest) {
+      updateGuestCourseTemplate({
+        name: semesterName.trim(),
+        semester_start: semesterStart,
+        total_weeks: totalWeeks,
+      });
+      setEditingTemplate(false);
+      return;
+    }
     const { error } = await supabase
       .from('course_template')
       .update({ name: semesterName.trim(), semester_start: semesterStart, total_weeks: totalWeeks, updated_at: new Date().toISOString() })
@@ -160,7 +211,24 @@ export default function CoursePage() {
   };
 
   const handleAddCourse = async () => {
-    if (!user || !template || !courseName.trim()) return;
+    if (!template || !courseName.trim()) return;
+    if (isGuest) {
+      addGuestCourse({
+        name: courseName.trim(),
+        day_of_week: dayOfWeek,
+        time_slot: timeSlot,
+        start_week: startWeek,
+        end_week: endWeek,
+        week_type: weekType,
+        remark: remark.trim() || null,
+      });
+      setCourseName('');
+      setRemark('');
+      setWeekType('all');
+      setShowAddForm(false);
+      return;
+    }
+    if (!user) return;
     const { error } = await supabase.from('course').insert({
       template_id: template.id,
       user_id: user.id,
@@ -182,6 +250,19 @@ export default function CoursePage() {
   };
 
   const handleUpdateCourse = async (id: string) => {
+    if (isGuest) {
+      updateGuestCourse(id, {
+        name: editCourseName.trim(),
+        day_of_week: editDayOfWeek,
+        time_slot: editTimeSlot,
+        start_week: editStartWeek,
+        end_week: editEndWeek,
+        week_type: editWeekType,
+        remark: editRemark.trim() || null,
+      });
+      setEditingCourseId(null);
+      return;
+    }
     const { error } = await supabase.from('course')
       .update({
         name: editCourseName.trim(),
@@ -200,6 +281,10 @@ export default function CoursePage() {
   };
 
   const handleDeleteCourse = async (id: string) => {
+    if (isGuest) {
+      deleteGuestCourse(id);
+      return;
+    }
     await supabase.from('course').delete().eq('id', id);
     fetchCourses();
   };
@@ -210,7 +295,14 @@ export default function CoursePage() {
 
   // 一键生成日程
   const handleImport = async () => {
-    if (!user || !template || courses.length === 0) return;
+    if (!template || courses.length === 0) return;
+    if (isGuest) {
+      setImporting(true);
+      importGuestCoursesToSchedules();
+      setImporting(false);
+      return;
+    }
+    if (!user) return;
     setImporting(true);
 
     if (template.is_imported) {
@@ -262,7 +354,7 @@ export default function CoursePage() {
     return acc;
   }, {} as Record<number, Course[]>);
 
-  if (!user) return null;
+  if (!user && !isGuest) return null;
 
   const cardClass = `rounded-2xl p-5 shadow-lg ${theme === 'dark' ? 'bg-slate-800' : 'bg-white'}`;
   const inputClass = `w-full px-3 py-2 rounded-xl ${theme === 'dark' ? 'bg-slate-700 text-white' : 'bg-slate-50 text-slate-900'}`;
@@ -292,6 +384,7 @@ export default function CoursePage() {
   return (
     <div className={`min-h-screen pb-48 ${theme === 'dark' ? 'bg-slate-900' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'}`}>
       <div className="p-4 max-w-lg mx-auto">
+        <GuestBanner />
         {/* 顶部 */}
         <div className="flex justify-between items-center mb-6">
           <button onClick={toggleTheme} className={`p-3 rounded-2xl shadow-lg ${theme === 'dark' ? 'bg-slate-800 text-yellow-400' : 'bg-white text-slate-700'}`}>
